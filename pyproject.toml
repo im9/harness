@@ -9,6 +9,7 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
+    "argon2-cffi>=25.1.0",
 ]
 
 [build-system]
