@@ -5,6 +5,14 @@ Designed to curb impulsive trading and enforce rule-based decision-making.
 
 Future extensions: crude oil, CFDs, and other derivatives.
 
+## Setup
+
+After cloning, enable the pre-push hook (lint + test):
+
+```sh
+git config core.hooksPath .githooks
+```
+
 ## Mandatory Workflow — 4 Gates
 
 Must not skip or reorder.

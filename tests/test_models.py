@@ -23,9 +23,7 @@ async def test_user_roundtrip(session: AsyncSession) -> None:
     await _make_user(session)
     await session.commit()
 
-    fetched = (
-        await session.execute(select(User).where(User.username == "alice"))
-    ).scalar_one()
+    fetched = (await session.execute(select(User).where(User.username == "alice"))).scalar_one()
     assert fetched.username == "alice"
     # created_at auto-populated by default=_utcnow; non-null is the contract.
     assert fetched.created_at is not None
@@ -65,9 +63,7 @@ async def test_rule_roundtrip(session: AsyncSession) -> None:
     session.add(rule)
     await session.commit()
 
-    fetched = (
-        await session.execute(select(Rule).where(Rule.name == "breakout-20ma"))
-    ).scalar_one()
+    fetched = (await session.execute(select(Rule).where(Rule.name == "breakout-20ma"))).scalar_one()
     # enabled defaults to True — this is the contract so new rules are active on creation.
     assert fetched.enabled is True
 
@@ -107,9 +103,7 @@ async def test_user_has_many_trade_journals(session: AsyncSession) -> None:
 
     fetched = (
         await session.execute(
-            select(User)
-            .options(selectinload(User.trade_journals))
-            .where(User.id == user.id)
+            select(User).options(selectinload(User.trade_journals)).where(User.id == user.id)
         )
     ).scalar_one()
     # 3 journals inserted for one user — the relationship should expose all of them.

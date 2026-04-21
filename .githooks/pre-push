@@ -1,0 +1,23 @@
+#!/bin/sh
+# Pre-push hook: run lint + tests before pushing.
+# Bypass with: git push --no-verify
+
+set -e
+
+echo "Running pre-push checks..."
+
+# Backend (Python)
+echo "→ ruff check"
+uv run ruff check src tests
+echo "→ ruff format --check"
+uv run ruff format --check src tests
+echo "→ pytest"
+uv run pytest
+
+# Frontend (TypeScript + React)
+echo "→ eslint"
+(cd frontend && pnpm lint)
+echo "→ vitest"
+(cd frontend && pnpm test:run)
+
+echo "All checks passed."

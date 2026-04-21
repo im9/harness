@@ -115,7 +115,7 @@ Backend and frontend live side-by-side under one repo. `frontend/` is a dedicate
 
 ## Implementation
 
-Order: build a working local boilerplate, publish the repo and wire CI, then proceed with auth and dev-server integration.
+Order: build a working local boilerplate, publish the repo and set up a local quality gate (git hooks), then proceed with auth and dev-server integration. CI is deferred until hosting/deploy is decided.
 
 - [x] `.gitignore`, `.env.example`
 - [x] Python project setup (uv, pyproject.toml, FastAPI hello world)
@@ -125,7 +125,8 @@ Order: build a working local boilerplate, publish the repo and wire CI, then pro
 - [x] Initial commit (bootstrap scaffold)
 - [x] Create GitHub repository (public)
 - [x] Push to remote
-- [ ] CI: GitHub Actions (lint + test)
+- [x] Git hooks: `.githooks/pre-push` runs lint + test (native shell, enabled via `git config core.hooksPath .githooks`)
+- [ ] CI: GitHub Actions for build + deploy (deferred — depends on hosting decision in ADR 002)
 - [ ] Auth module: Argon2id (argon2-cffi) + TOTP (pyotp) + JWT (PyJWT, HS256)
 - [ ] Refresh token table + rotation + reuse detection
 - [ ] Auth CLI: `harness init-auth` for initial credential setup

@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from harness.db import Base
 from harness import models  # noqa: F401  # register models on Base.metadata
+from harness.db import Base
 
 
 @pytest_asyncio.fixture
