@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Test / lint caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# Build output
+build/
+dist/
+
+# Node / Vite
+node_modules/
+.vite/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
