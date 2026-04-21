@@ -26,7 +26,51 @@ Requirements:
 | Frontend | React (SPA) | Rich UI, seamless navigation. Largest ecosystem for charting libraries (recharts, lightweight-charts). |
 | Database | SQLite + SQLAlchemy | Single user, no write contention. File-based backup. Migrating to PostgreSQL later requires only a connection string change. |
 | Notifications | Pluggable (LINE, Slack, etc.) | Primary notification channel is configurable. |
-| Auth | Self-implemented (bcrypt + pyotp + JWT) | Password + TOTP (Google Authenticator). Learning objective. No user registration flow needed — CLI-based initial setup. |
+| Auth | Self-implemented (Argon2id + pyotp + JWT) | Password + TOTP (Google Authenticator). Learning objective. No user registration flow needed — CLI-based initial setup. See [Authentication](#authentication) for details. |
+
+### Authentication
+
+| Concern | Choice | Rationale |
+|---------|--------|-----------|
+| Password hash | Argon2id via `argon2-cffi` | OWASP 2024 recommendation. Memory-hard, resistant to GPU/ASIC attacks. Default parameters acceptable for single-user scale. |
+| TOTP | `pyotp` | De facto standard. Compatible with Google Authenticator / Authy. |
+| JWT | `PyJWT` | Minimal, actively maintained. Scope fits single-service needs. |
+| Signing algorithm | HS256 (symmetric) | Single service verifies its own tokens. Asymmetric keys add complexity without benefit here. |
+| 2FA flow | Password + TOTP verified in one `/login` call, then JWT issued | Single-step is simpler than partial-token → full-token. Acceptable for single user. |
+| Signing secret | Env var `HARNESS_JWT_SECRET` (≥32 bytes, random) | Rotating the secret invalidates all issued tokens — acceptable recovery mechanism. |
+
+#### Token strategy
+
+Access + refresh tokens with rotation and reuse detection (OAuth 2.0 pattern).
+
+| Token | Form | TTL | Storage (client) | Storage (server) |
+|-------|------|-----|------------------|------------------|
+| Access | JWT (HS256) | 15 min | httpOnly + Secure + SameSite=Strict cookie | Stateless (not stored) |
+| Refresh | Opaque random string (≥32 bytes) | 7 days | httpOnly + Secure + SameSite=Strict cookie, path=`/auth/refresh` | SQLite, hashed (SHA-256) |
+
+Rules:
+- **Rotation**: every `/auth/refresh` call invalidates the presented refresh token and issues a new one in the same family.
+- **Reuse detection**: if an already-revoked refresh token is presented, the entire family is revoked — forces re-login on suspected theft.
+- **Logout**: revokes the current refresh token family. Access token expires naturally within 15 min.
+- **JWT claims**: `sub` (user id), `iat`, `exp`. No `jti` — access tokens are not revoked individually; rely on short TTL.
+
+Refresh token table:
+
+```sql
+CREATE TABLE refresh_tokens (
+  id          TEXT PRIMARY KEY,        -- random uuid
+  user_id     INTEGER NOT NULL,
+  token_hash  TEXT NOT NULL,           -- SHA-256 of the token value
+  family_id   TEXT NOT NULL,           -- new on login; preserved on rotation
+  expires_at  TIMESTAMP NOT NULL,
+  revoked_at  TIMESTAMP                -- set on rotation, logout, or reuse detection
+);
+```
+
+Rationale for choosing the full pattern (vs. access-only with long TTL):
+- Learning objective: this is the standard pattern used in production systems; worth implementing end-to-end at least once.
+- Revocation: refresh tokens stored server-side enable explicit logout and compromise recovery.
+- Short-lived access tokens limit blast radius if a token does leak.
 
 ### Infrastructure
 
@@ -71,24 +115,27 @@ Backend and frontend live side-by-side under one repo. `frontend/` is a dedicate
 
 ## Implementation
 
-Order: build a working local boilerplate first, verify on localhost, then push to a new remote.
+Order: build a working local boilerplate, publish the repo and wire CI, then proceed with auth and dev-server integration.
 
 - [x] `.gitignore`, `.env.example`
 - [x] Python project setup (uv, pyproject.toml, FastAPI hello world)
 - [x] Test infrastructure: pytest (backend), vitest (frontend)
 - [x] React project setup (Vite + React + TypeScript)
 - [x] SQLite + SQLAlchemy schema skeleton
-- [ ] Auth module: password hash (bcrypt) + TOTP (pyotp) + JWT
+- [x] Initial commit (bootstrap scaffold)
+- [x] Create GitHub repository (public)
+- [x] Push to remote
+- [ ] CI: GitHub Actions (lint + test)
+- [ ] Auth module: Argon2id (argon2-cffi) + TOTP (pyotp) + JWT (PyJWT, HS256)
+- [ ] Refresh token table + rotation + reuse detection
 - [ ] Auth CLI: `harness init-auth` for initial credential setup
 - [ ] Dev server wiring: FastAPI serves React SPA
 - [ ] Verify on localhost (login → dashboard)
-- [ ] Create GitHub repository (public)
-- [ ] Initial commit and push
-- [ ] CI: GitHub Actions (lint + test)
 
 ## Consequences
 
 - Two-language stack (Python + TypeScript) adds complexity but plays to each language's strength
 - SQLite limits future multi-user scenarios — acceptable since multi-user is out of scope
 - Self-implemented auth carries security responsibility — HTTPS via Tailscale mitigates transport-layer risk
+- Refresh token rotation + reuse detection adds ~200-300 lines of backend code vs. access-only, but exercises the standard production pattern and enables explicit logout/revocation
 - Development starts on localhost; deployment strategy is decoupled and decided later
