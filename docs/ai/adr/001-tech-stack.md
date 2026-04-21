@@ -126,8 +126,10 @@ Order: build a working local boilerplate, publish the repo and set up a local qu
 - [x] Create GitHub repository (public)
 - [x] Push to remote
 - [x] Git hooks: `.githooks/pre-push` runs lint + test (native shell, enabled via `git config core.hooksPath .githooks`)
-- [ ] Auth module: Argon2id (argon2-cffi) + TOTP (pyotp) + JWT (PyJWT, HS256)
-- [ ] Refresh token table + rotation + reuse detection
+- [x] Auth — password hashing (Argon2id via argon2-cffi)
+- [ ] Auth — TOTP verification (pyotp)
+- [ ] Auth — JWT issue/verify (PyJWT, HS256)
+- [ ] Auth — refresh token table + rotation + reuse detection
 - [ ] Auth CLI: `harness init-auth` for initial credential setup
 - [ ] Dev server wiring: FastAPI serves React SPA
 - [ ] Verify on localhost (login → dashboard)
