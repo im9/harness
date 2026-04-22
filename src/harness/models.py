@@ -50,6 +50,21 @@ class Rule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    # TEXT uuid per ADR 001 §Token strategy. String(36) fits the canonical
+    # 8-4-4-4-12 form; no DB-side default so the service layer can assign ids
+    # deterministically in tests.
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # SHA-256 hex digest = 64 chars. We never store the plaintext token.
+    token_hash: Mapped[str] = mapped_column(String(64))
+    family_id: Mapped[str] = mapped_column(String(36))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 
