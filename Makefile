@@ -1,4 +1,4 @@
-.PHONY: dev-up dev-down dev-status dev-logs totp check help
+.PHONY: dev-up dev-down dev-status dev-logs totp auth-reset check help
 
 DEV_DIR        := .dev
 BACKEND_PID    := $(DEV_DIR)/backend.pid
@@ -21,6 +21,7 @@ help:
 	@echo "  make dev-status  Report which ports are listening"
 	@echo "  make dev-logs    Tail both logs (Ctrl-C to exit)"
 	@echo "  make totp        Print the current 6-digit authenticator code for the DB user"
+	@echo "  make auth-reset  Rotate password + TOTP secret for the DB user (prompts interactively)"
 	@echo "  make check       Run the full pre-push quality gate (ruff + pytest + eslint + vitest)"
 
 dev-up:
@@ -76,6 +77,12 @@ dev-logs:
 
 totp:
 	@uv run python scripts/dev_totp.py
+
+# Interactive recovery: prompts for username + new password, rotates both
+# the password hash and the TOTP secret, and prints the new otpauth:// URI
+# for re-registration. Use when the password or authenticator device is lost.
+auth-reset:
+	@uv run harness init-auth --reset
 
 # The canonical pre-commit / pre-push quality gate. One command so the
 # pre-push hook, the /commit skill, and any operator invocation all agree
