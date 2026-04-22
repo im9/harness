@@ -211,6 +211,67 @@ change.
 
 No tool use in Phase 1 — text in, text out.
 
+### Development providers (mock-first strategy)
+
+The three provider protocols (`MarketDataProvider`,
+`EventCalendarProvider`, `ChatProvider`) are deliberately narrow so that
+**all Phase 1 development, testing, and demos run against mock
+implementations** without any real vendor account.
+
+Two constraints make this non-optional:
+
+1. **Time-to-value.** Provisioning broker / market-data / paid-API
+   accounts is measured in days to weeks. Engine, rule overlay, and
+   cockpit work must not block on external onboarding.
+2. **Public-repo privacy.** harness is a public repository
+   (`CLAUDE.md` constraint: no broker names, device types, or messaging
+   apps). Concrete vendor selections are operator-private and must not
+   be identifiable from source code, config schema field names,
+   dependency manifests, test fixtures, or example values. The mock
+   providers are the *only* concrete providers that ship in the public
+   tree.
+
+**Design constraints on mock providers:**
+
+- Implement the abstract protocol faithfully — no fields, methods,
+  metadata, or error shapes that would only appear in a specific real
+  vendor's API. The mock is a reference implementation of the
+  protocol, not a mirror of any one broker.
+- Settings UI lists `mock` first among registered providers and
+  selects it by default.
+- Multiple mock *modes* are supported under a single `kind: "mock"`
+  entry (selected by provider-options form):
+  - `synthesized` — random-walk tick stream with configurable drift,
+    volatility, and session-gap behavior.
+  - `replay` — tick / bar / event playback from a recorded file in a
+    project-defined neutral format (CSV or Parquet), never a
+    vendor-specific dump.
+  - `scenario` — hand-authored sequences for testing specific engine
+    paths (opening-range breakout, failed breakout, macro-event mute,
+    rule-cap lockout, retreat trigger).
+- Fixture files in `tests/fixtures/` are synthetic or heavily
+  redacted — no raw capture from any real vendor, and nothing that
+  would fingerprint the operator's actual instrument universe,
+  session times, or typical trade sizes.
+
+**Mock modes per protocol:**
+
+| Protocol | Mock modes | Notes |
+|---|---|---|
+| `MarketDataProvider` | `synthesized`, `replay`, `scenario` | Random walk suffices for UI/plumbing; scenario files drive engine unit tests |
+| `EventCalendarProvider` | `yaml` | Reads directly from the operator override YAML; no primary source |
+| `ChatProvider` | `echo`, `local` | Echo is deterministic for tests; local LLM (e.g. self-hosted) for reasoning-quality PoC without a paid key |
+
+**Real-vendor adapters (out of public tree):**
+
+Real adapters are loaded via the registry's plugin-discovery mechanism.
+The protocol definitions and registry live in this repo; concrete
+adapter classes live outside it — a separately-installed Python
+package, a private sibling repo, or a gitignored `src/providers/private/`
+folder, at the operator's discretion. The public tree must remain able
+to run end-to-end against mocks alone, and no test, fixture, or
+example may reference a real adapter by name.
+
 ### UI (built on ADR 003 foundations)
 
 Two top-level routes in Phase 1:
@@ -333,26 +394,21 @@ Channel: pluggable webhook per ADR 001.
 Ordered so each step is independently demonstrable and upstream-blocking
 uncertainties surface early.
 
-- [ ] Resolve data-source onboarding (account, subscription, gateway
-      install) per operator private config
-- [ ] PoC: ingest one session of tick data through the chosen provider;
-      persist raw ticks to SQLite for offline development
-- [ ] PoC: event-calendar ingestion + YAML override merge
-- [ ] PoC: chat provider reasoning quality check with a hand-crafted
-      market-snapshot prompt
 - [ ] Backend: Pydantic config schema (instruments, sessions, rule overlay,
       setup library, macro overlay, provider selections)
 - [ ] Backend: config persistence in SQLite + versioned migration story
 - [ ] Backend: `GET /api/settings`, `PUT /api/settings` + per-provider
       "test connection" endpoints
-- [ ] Backend: `MarketDataProvider` protocol + provider registry + one
-      concrete implementation + in-memory tick/bar ring buffer
+- [ ] Backend: `MarketDataProvider` protocol + provider registry + mock
+      implementation (synthesized + replay + scenario modes) +
+      in-memory tick/bar ring buffer
+- [ ] Backend: `EventCalendarProvider` protocol + registry + mock (YAML)
+- [ ] Backend: `ChatProvider` protocol + registry + mock (echo + local)
+      + SSE route
 - [ ] Backend: `SetupEngine` — starter setup library as state machines,
       tick-driven, pure functions of (state, tick) → (new state, emission)
 - [ ] Backend: `RuleOverlay` (cap, cooldown, overrides)
 - [ ] Backend: `MacroOverlay` (event-window effects on recommendations)
-- [ ] Backend: `ChatProvider` protocol + provider registry + one concrete
-      implementation + SSE route
 - [ ] Backend: `GET /api/cockpit` + `WebSocket /ws/cockpit`
 - [ ] Frontend (on ADR 003 scaffold): `/settings` screen — schema-driven
       forms per section, "test connection" feedback, persist on save
@@ -363,9 +419,13 @@ uncertainties surface early.
       from AI references to chart annotations)
 - [ ] CLI: `harness config import <yaml>` / `harness config export <yaml>`
       for bootstrap and backup
-- [ ] End-to-end: replay a recorded historical session; verify engine
-      output matches a hand-worked example
-- [ ] Live dry-run: one session with the system running passively
+- [ ] End-to-end on mocks: scenario-driven session exercises the full
+      pipeline (tick → engine → recommendation → UI → chat context)
+      without any real vendor dependency
+- [ ] (Post-mock) Resolve data-source onboarding per operator private
+      config; develop the real-vendor adapter outside the public tree
+- [ ] (Post-mock) Live dry-run: one session with the real adapter
+      running passively
 
 ## Considerations
 
