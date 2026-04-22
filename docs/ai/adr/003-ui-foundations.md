@@ -140,14 +140,14 @@ issues that are invisible until someone uses a screen reader or the keyboard.
 Ordered so each step is verifiable in isolation. Each step ends with
 `pnpm test:run && pnpm lint && pnpm build` green.
 
-- [ ] Install Tailwind v4 + PostCSS; configure `src/index.css` tokens
-- [ ] Run `npx shadcn@latest init`; commit generated `components.json`,
+- [x] Install Tailwind v4 + PostCSS; configure `src/index.css` tokens
+- [x] Run `npx shadcn@latest init`; commit generated `components.json`,
       `lib/utils.ts`, and initial `globals.css`
-- [ ] Add `components/ui/` to the repo (start empty; components added on
-      first use)
-- [ ] Install `react-hook-form`, `zod`, `@hookform/resolvers`
-- [ ] Install `lucide-react`, `sonner`
-- [ ] Add `eslint-plugin-jsx-a11y`; flip strict rules on
+- [x] Add `components/ui/` to the repo (start empty; components added on
+      first use) — init brought `button.tsx`; kept for S4 Login rebuild
+- [x] Install `react-hook-form`, `zod`, `@hookform/resolvers`
+- [x] Install `lucide-react` (via nova preset), `sonner`
+- [x] Add `eslint-plugin-jsx-a11y`; flip strict rules on
 - [ ] Build `AppShell` component; wrap `<Routes>` in it
 - [ ] Rebuild `routes/Login.tsx` using shadcn `Form` + `Input` + `Button` +
       react-hook-form + zod; expect same tests still pass (behavior
