@@ -1,23 +1,9 @@
 #!/bin/sh
-# Pre-push hook: run lint + tests before pushing.
-# Bypass with: git push --no-verify
+# Pre-push hook: delegate to `make check` so the quality gate is defined
+# once (in the Makefile) and invoked identically by this hook, by the
+# /commit skill, and by any manual invocation. Bypass: git push --no-verify.
 
 set -e
-
-echo "Running pre-push checks..."
-
-# Backend (Python)
-echo "→ ruff check"
-uv run ruff check src tests
-echo "→ ruff format --check"
-uv run ruff format --check src tests
-echo "→ pytest"
-uv run pytest
-
-# Frontend (TypeScript + React)
-echo "→ eslint"
-(cd frontend && pnpm lint)
-echo "→ vitest"
-(cd frontend && pnpm test:run)
-
+echo "Running pre-push checks (make check)..."
+make check
 echo "All checks passed."

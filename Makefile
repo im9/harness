@@ -1,4 +1,4 @@
-.PHONY: dev-up dev-down dev-status dev-logs totp help
+.PHONY: dev-up dev-down dev-status dev-logs totp check help
 
 DEV_DIR        := .dev
 BACKEND_PID    := $(DEV_DIR)/backend.pid
@@ -21,6 +21,7 @@ help:
 	@echo "  make dev-status  Report which ports are listening"
 	@echo "  make dev-logs    Tail both logs (Ctrl-C to exit)"
 	@echo "  make totp        Print the current 6-digit authenticator code for the DB user"
+	@echo "  make check       Run the full pre-push quality gate (ruff + pytest + eslint + vitest)"
 
 dev-up:
 	@mkdir -p $(DEV_DIR)
@@ -75,3 +76,13 @@ dev-logs:
 
 totp:
 	@uv run python scripts/dev_totp.py
+
+# The canonical pre-commit / pre-push quality gate. One command so the
+# pre-push hook, the /commit skill, and any operator invocation all agree
+# on what "clean" means.
+check:
+	uv run ruff check src tests
+	uv run ruff format --check src tests
+	uv run pytest
+	pnpm -C frontend lint
+	pnpm -C frontend test:run
