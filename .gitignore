@@ -32,6 +32,9 @@ node_modules/
 .env.*
 !.env.example
 
+# Dev server PIDs / logs (Makefile dev-up)
+.dev/
+
 # Editors
 .vscode/
 .idea/

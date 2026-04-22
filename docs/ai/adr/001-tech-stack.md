@@ -131,7 +131,7 @@ Order: build a working local boilerplate, publish the repo and set up a local qu
 - [x] Auth — JWT issue/verify (PyJWT, HS256)
 - [x] Auth — refresh token table + rotation + reuse detection
 - [x] Auth CLI: `harness init-auth` for initial credential setup
-- [ ] Dev server wiring: FastAPI serves React SPA
+- [x] Dev server wiring: Vite (port 5787) proxies `/api/*` to FastAPI (port 8787); `harness dev` launches uvicorn with autoreload. `/health` stays at root per liveness-probe convention.
 - [ ] Verify on localhost (login → dashboard)
 
 ## Consequences
