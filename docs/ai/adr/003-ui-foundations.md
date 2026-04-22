@@ -119,9 +119,30 @@ primitive rather than re-debating it.
   **multi-pane** layout (price + volume).
 - Dark theme out of the box; permissive license; active upstream.
 
-Rejected alternatives: `recharts` (general-purpose, lacks OHLC idioms),
-`apexcharts` (heavier, weaker trading primitives), embedded TradingView
-widget (requires paid tier for most annotations; black-box DOM).
+Rejected alternatives: `apexcharts` (heavier, weaker trading primitives),
+embedded TradingView widget (requires paid tier for most annotations;
+black-box DOM). `recharts` is unsuitable for the primary trading surface
+(no OHLC idioms, re-render model struggles with tick streams) but is
+used indirectly via Tremor Raw for secondary summary surfaces (below).
+
+### Summary / KPI widgets: Tremor Raw (copy-paste, via Recharts)
+
+Complement — not replace — lightweight-charts. The trading chart is
+tick-driven and multi-pane; the cockpit also has status-strip metrics,
+rule-overlay gauges, and session summaries that are plainer and benefit
+from dashboard-grade widgets. Tremor Raw is the foundation choice for
+these:
+
+- `CategoryBar` — rule-overlay gauge (used loss vs cap, segmented by
+  risk tier with a marker dot).
+- `Tracker` — session history block row (win / loss / scratch colors).
+- `AreaChart` — intraday P&L curve, equity-by-session trend.
+- `BarChart` — setup-by-setup hit rate, R-multiple distribution.
+
+These widgets are copy-paste primitives (vendored into
+`src/components/ui/`), built on Recharts + Tailwind v4, and match the
+shadcn `data-slot` + `cn` convention. No npm dep on `@tremor/react` —
+see Considerations.
 
 ### Tabular data: TanStack Table (when needed)
 
@@ -156,10 +177,15 @@ Ordered so each step is verifiable in isolation. Each step ends with
 - [x] Add `NotFound` route and `ErrorBoundary` at the router root
 - [x] Add dark-mode toggle in the header; wire `localStorage` + initial
       `prefers-color-scheme`
-- [ ] Update `App.test.tsx` selectors to work with shadcn's DOM structure
+- [x] Update `App.test.tsx` selectors to work with shadcn's DOM structure
       (assertions target aria roles, not markup details — should survive)
-- [ ] Smoke test on mobile viewport (Chrome devtools responsive mode) —
+- [x] Smoke test on mobile viewport (Chrome devtools responsive mode) —
       Login form and empty Dashboard render without horizontal scroll
+- [x] Tremor spike: prototype KPI widgets on Dashboard to evaluate fit
+      for the ADR 004 cockpit summary surface and Tailwind v4
+      compatibility. **Outcome: Tremor Raw promoted to foundation** —
+      see "Summary / KPI widgets" in Decision and the spike log in
+      Considerations.
 
 ## Considerations
 
@@ -188,6 +214,32 @@ are tree-shakable per-component. Estimate after Login rebuild and AppShell:
 ~380–450 KB. Not a concern for a single-user tool on a local network, but
 worth noting so later feature additions are evaluated.
 
+### Tremor spike log (why Tremor Raw, not `@tremor/react`)
+
+The initial attempt installed the `@tremor/react` npm package (v3.18.7).
+It builds, but its internal styles reference Tailwind v3 theme tokens
+(`bg-tremor-background`, `border-tremor-border`, etc.) that do not exist
+in our Tailwind v4 CSS-first config. Result: components render
+structurally but without any Tremor-specific styling — cards had only
+borders, `CategoryBar` showed axis labels but no colored segments, and
+`Tracker` cells had zero height. Patching v4 to satisfy v3 conventions
+(reintroducing `tailwind.config.js`-style tokens) was technically
+possible but non-idiomatic and brittle against upstream.
+
+Tremor Raw is the v4-native successor — copy-paste primitives using
+Tailwind utility classes directly and CSS variables compatible with our
+shadcn token system. Four widgets landed in `src/components/ui/` for
+Phase 1 use: `CategoryBar`, `Tracker`, `AreaChart`, `BarChart`. Local
+simplifications on each: `cx` → `cn`, Tremor's Legend scroll slider and
+`@remixicon` icons dropped (not needed), `onValueChange` / active-bar
+interactivity dropped (can be reintroduced if required).
+
+`recharts` is the runtime dependency added (the underlying chart engine
+Tremor Raw's charts wrap). +380 KB to the bundle, accepted because the
+cockpit summary surface is load-bearing and not deferrable. `recharts`
+stays out of the primary trading chart (OHLC + indicator overlays + tick
+streams) which remains on lightweight-charts.
+
 ### Mantine left on the table as a fallback
 
 If shadcn ceremony proves to slow MVP velocity, Mantine is the fallback.
@@ -206,9 +258,10 @@ differ enough that half-migration would be worse than either pure choice.
 
 ## Future Extensions
 
-- **Tremor** for KPI cards and dashboard gauges if the cockpit gains
-  non-chart data-dense summaries. Tremor is Tailwind-based and composes
-  with shadcn.
+- **Additional Tremor Raw widgets** (DonutChart, LineChart, SparkChart,
+  ProgressCircle, BarList) — copy-paste in when a specific cockpit or
+  review surface needs them. The base (chart-utils, Recharts) is
+  already wired.
 - **Storybook** only if the custom-component count justifies it.
 - **Mobile PWA manifest** + install prompt once the tool is deployed and
   routinely accessed from a phone.

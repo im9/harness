@@ -312,7 +312,7 @@ Every piece of engine state has a distinct visual that a glance decodes:
 | `EXIT` | Steady accent banner + marker |
 | `RETREAT` | High-contrast red banner + pulsing marker + browser/webhook notification |
 | Volume | Dedicated sub-pane below price |
-| Rule-overlay state | Horizontal gauge bar beneath volume: used loss vs cap, live-updated with unrealized P&L; color transitions as the cap is approached |
+| Rule-overlay state | Horizontal gauge bar beneath volume: used loss vs cap, live-updated with unrealized P&L; color transitions as the cap is approached. Rendered with Tremor Raw `CategoryBar` (ADR 003 Summary/KPI widgets). |
 | Macro event window | Vertical band on the chart covering the pre/event/post window, labeled with event name |
 
 #### Layout
@@ -343,8 +343,12 @@ opens on demand. When an AI message references a chart element by time or
 name (e.g. "the sweep at 14:23"), the corresponding marker pulses briefly
 on the chart (cross-link between text and visual context).
 
-A top **status strip** spans the header with: today's aggregate P&L,
-session phase, next macro event and countdown.
+A top **status strip** spans the header with: today's aggregate P&L (a
+sparkline-scale Tremor Raw `AreaChart` of intraday P&L alongside the
+current number), session phase, next macro event and countdown. When
+a review-style summary screen lands alongside the cockpit (setup hit
+rate, session win/loss history), Tremor Raw `BarChart` and `Tracker`
+are the pinned primitives (ADR 003 Summary/KPI widgets).
 
 #### Timeframes
 
