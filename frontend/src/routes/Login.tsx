@@ -1,108 +1,164 @@
-import { useState, type FormEvent } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
-import { LoginError, useAuth } from '../auth-context'
+import { z } from 'zod'
+
+import { LoginError, useAuth } from '@/auth-context'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 
 const TOTP_LENGTH = 6
+
+const loginSchema = z.object({
+  username: z.string().trim().min(1, 'Enter your username'),
+  password: z.string().min(1, 'Enter your password'),
+  totpCode: z
+    .string()
+    .length(
+      TOTP_LENGTH,
+      `Enter the ${TOTP_LENGTH}-digit code from your authenticator app`,
+    )
+    .regex(/^\d+$/, 'Code must be digits only'),
+})
+
+type LoginFormValues = z.infer<typeof loginSchema>
 
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [totpCode, setTotpCode] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [serverError, setServerError] = useState('')
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError('')
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { username: '', password: '', totpCode: '' },
+  })
 
-    // Client-side validation with custom messages rather than HTML5 `required`
-    // / `pattern`, which render locale-specific browser popovers (e.g. the
-    // Japanese "指定されている形式で入力してください") and obscure the actual
-    // problem. These checks surface our own text via the alert region below.
-    if (!username.trim() || !password || totpCode.length !== TOTP_LENGTH) {
-      setError(
-        `Enter username, password, and the ${TOTP_LENGTH}-digit code from your authenticator app.`,
-      )
-      return
-    }
-
-    setSubmitting(true)
+  const onSubmit = async (values: LoginFormValues) => {
+    setServerError('')
     try {
-      await login(username, password, totpCode)
+      await login(values.username, values.password, values.totpCode)
       navigate('/', { replace: true })
     } catch (e) {
       if (e instanceof LoginError && e.status === 401) {
-        setError('Invalid credentials')
+        setServerError('Invalid credentials')
       } else if (e instanceof LoginError) {
-        setError(`Sign-in failed (HTTP ${e.status}): ${e.message}`)
+        setServerError(`Sign-in failed (HTTP ${e.status}): ${e.message}`)
       } else {
-        setError('Sign-in failed: network error')
+        setServerError('Sign-in failed: network error')
       }
-      setSubmitting(false)
     }
   }
 
   return (
-    <main>
-      <h1>harness</h1>
-      <form onSubmit={handleSubmit} aria-label="sign in" noValidate>
-        <p>
-          <label>
-            Username
-            <br />
-            <input
-              type="text"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </label>
-        </p>
-        <p>
-          <label>
-            Password
-            <br />
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-        </p>
-        <p>
-          <label>
-            Authenticator code
-            <br />
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={TOTP_LENGTH}
-              size={TOTP_LENGTH}
-              placeholder="123456"
-              value={totpCode}
-              // Strip non-digits on input so pasted codes with spaces/dashes
-              // (common from password managers) become plain digits; also
-              // prevents accidental paste of the setup secret.
-              onChange={(e) =>
-                setTotpCode(e.target.value.replace(/\D/g, '').slice(0, TOTP_LENGTH))
-              }
-              aria-describedby="totp-help"
-            />
-          </label>
-          <br />
-          <small id="totp-help">
-            {TOTP_LENGTH}-digit code from your authenticator app (not the setup secret).
-          </small>
-        </p>
-        <button type="submit" disabled={submitting}>
-          Sign in
-        </button>
-        {error && <p role="alert">{error}</p>}
-      </form>
+    <main className="flex min-h-dvh items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>harness</CardTitle>
+          <CardDescription>Sign in to your account</CardDescription>
+        </CardHeader>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            aria-label="sign in"
+            noValidate
+          >
+            <CardContent className="flex flex-col gap-4">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input autoComplete="username" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete="current-password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="totpCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Authenticator code</FormLabel>
+                    <FormControl>
+                      <Input
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={TOTP_LENGTH}
+                        placeholder="123456"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value
+                              .replace(/\D/g, '')
+                              .slice(0, TOTP_LENGTH),
+                          )
+                        }
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {TOTP_LENGTH}-digit code from your authenticator app (not
+                      the setup secret).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {serverError && (
+                <p role="alert" className="text-destructive text-sm">
+                  {serverError}
+                </p>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="w-full"
+              >
+                Sign in
+              </Button>
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
     </main>
   )
 }
