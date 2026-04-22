@@ -148,7 +148,7 @@ Ordered so each step is verifiable in isolation. Each step ends with
 - [x] Install `react-hook-form`, `zod`, `@hookform/resolvers`
 - [x] Install `lucide-react` (via nova preset), `sonner`
 - [x] Add `eslint-plugin-jsx-a11y`; flip strict rules on
-- [ ] Build `AppShell` component; wrap `<Routes>` in it
+- [x] Build `AppShell` component; wrap `<Routes>` in it
 - [ ] Rebuild `routes/Login.tsx` using shadcn `Form` + `Input` + `Button` +
       react-hook-form + zod; expect same tests still pass (behavior
       unchanged, only presentation)
