@@ -1,10 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
+    <script>
+      // Pre-hydration theme resolution. Keeps the first paint consistent
+      // with the final React-driven theme so there's no light-to-dark
+      // flash (or vice versa) during boot. <html class="dark"> is the
+      // static baseline (ADR 003 default); this script only removes it
+      // when the user has explicitly stored "light" or their OS prefers
+      // light with nothing stored. Mirror src/lib/theme.ts precedence.
+      (function () {
+        try {
+          var stored = localStorage.getItem('harness-theme')
+          if (stored === 'light') {
+            document.documentElement.classList.remove('dark')
+            return
+          }
+          if (stored === 'dark') return
+          if (
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: light)').matches
+          ) {
+            document.documentElement.classList.remove('dark')
+          }
+        } catch (_) {
+          // Storage or DOM access can fail in exotic configs; the static
+          // class="dark" on <html> keeps the ADR default intact.
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
