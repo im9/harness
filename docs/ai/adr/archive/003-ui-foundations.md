@@ -1,6 +1,6 @@
 # ADR 003: UI Foundations
 
-## Status: Proposed
+## Status: Implemented
 
 ## Context
 
