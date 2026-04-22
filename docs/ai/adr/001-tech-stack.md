@@ -128,7 +128,7 @@ Order: build a working local boilerplate, publish the repo and set up a local qu
 - [x] Git hooks: `.githooks/pre-push` runs lint + test (native shell, enabled via `git config core.hooksPath .githooks`)
 - [x] Auth — password hashing (Argon2id via argon2-cffi)
 - [x] Auth — TOTP verification (pyotp)
-- [ ] Auth — JWT issue/verify (PyJWT, HS256)
+- [x] Auth — JWT issue/verify (PyJWT, HS256)
 - [ ] Auth — refresh token table + rotation + reuse detection
 - [ ] Auth CLI: `harness init-auth` for initial credential setup
 - [ ] Dev server wiring: FastAPI serves React SPA
