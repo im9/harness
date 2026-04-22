@@ -130,7 +130,7 @@ Order: build a working local boilerplate, publish the repo and set up a local qu
 - [x] Auth — TOTP verification (pyotp)
 - [x] Auth — JWT issue/verify (PyJWT, HS256)
 - [x] Auth — refresh token table + rotation + reuse detection
-- [ ] Auth CLI: `harness init-auth` for initial credential setup
+- [x] Auth CLI: `harness init-auth` for initial credential setup
 - [ ] Dev server wiring: FastAPI serves React SPA
 - [ ] Verify on localhost (login → dashboard)
 
