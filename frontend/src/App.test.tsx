@@ -36,6 +36,41 @@ afterEach(() => {
 })
 
 describe('App routing', () => {
+  it('shows a session-check skeleton while /api/me is still in flight', () => {
+    const fetchMock = mockFetch()
+    // Pending-forever promise keeps status === "loading" so the skeleton
+    // branch is the terminal state for this assertion. The real probe
+    // resolves quickly; this simulates the first paint before it does.
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}))
+
+    renderAt('/')
+
+    // role="status" is the accessible landmark the loading indicator exposes
+    // so screen readers announce "Checking session" instead of staring at a
+    // silent pulse. Matching on the accessible name, not markup, survives
+    // visual redesigns of the skeleton block.
+    expect(
+      screen.getByRole('status', { name: /checking session/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('unmatched paths render a NotFound view inside the shell', async () => {
+    const fetchMock = mockFetch()
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { username: 'alice' }))
+
+    renderAt('/does-not-exist')
+
+    // The 404 view lives under the AppShell so operators keep the primary
+    // navigation to bounce back. Asserting on both the heading and the
+    // shell's nav landmark pins that relationship.
+    expect(
+      await screen.findByRole('heading', { name: /page not found/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('navigation', { name: /primary/i }),
+    ).toBeInTheDocument()
+  })
+
   it('when the session probe returns 401, the root route redirects to the login form', async () => {
     const fetchMock = mockFetch()
     fetchMock.mockResolvedValueOnce(jsonResponse(401))

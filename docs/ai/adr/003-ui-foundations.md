@@ -152,8 +152,8 @@ Ordered so each step is verifiable in isolation. Each step ends with
 - [x] Rebuild `routes/Login.tsx` using shadcn `Form` + `Input` + `Button` +
       react-hook-form + zod; expect same tests still pass (behavior
       unchanged, only presentation)
-- [ ] Replace `ProtectedRoute`'s `return null` with a centered `Skeleton`
-- [ ] Add `NotFound` route and `ErrorBoundary` at the router root
+- [x] Replace `ProtectedRoute`'s `return null` with a centered `Skeleton`
+- [x] Add `NotFound` route and `ErrorBoundary` at the router root
 - [ ] Add dark-mode toggle in the header; wire `localStorage` + initial
       `prefers-color-scheme`
 - [ ] Update `App.test.tsx` selectors to work with shadcn's DOM structure
