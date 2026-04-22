@@ -41,7 +41,7 @@ harness/
 
 ## Decision pointers
 
-- [ADR 001](adr/001-tech-stack.md) — Tech stack (FastAPI, React, SQLite, self-implemented auth, asdf + uv + pnpm)
+- [ADR 001](adr/archive/001-tech-stack.md) — Tech stack (FastAPI, React, SQLite, self-implemented auth, asdf + uv + pnpm)
 - [ADR 002](adr/002-containerization.md) — Dev native; deploy containerized; hosting target remains open
 
 ## Hard constraints

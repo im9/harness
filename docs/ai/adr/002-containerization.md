@@ -1,8 +1,6 @@
 # ADR 002: Containerization Strategy
 
-## Status
-
-Accepted
+## Status: Proposed
 
 ## Context
 
@@ -47,27 +45,37 @@ Local-dev reproducibility is therefore already high. What the dev stack does *no
 - The development environment.
 - The frontend as a separate container (not worth the operational complexity for a single-user tool).
 
-## Open Questions
-
 ### Hosting target
 
-The hosting decision depends on three filters:
+Filters applied (all four must hold):
 
-1. **Persistent filesystem** — SQLite requires a volume that survives container restarts. Platforms with ephemeral filesystems are effectively ruled out (e.g., Cloud Run without Cloud Storage FUSE).
-2. **Always-on vs sleep-on-idle** — notifications and Tailscale access must not pay a multi-second cold start every time.
-3. **Cost** — personal project, target is free-tier or ≤1,000 JPY/month.
+1. **Persistent filesystem** — SQLite requires a volume that survives container restarts. Ephemeral filesystems are ruled out.
+2. **Always-on** — notifications and Tailscale access must not pay a multi-second cold start.
+3. **Cost** — free-tier or ≤1,000 JPY/month.
+4. **Single-container + volume compatibility** — matches the deploy model above without rewriting to a serverless request handler.
 
-Candidates:
+Candidates evaluated:
 
-| Platform | Persistent FS | Always-on | Cost | Notes |
-|----------|---------------|-----------|------|-------|
-| VPS (Sakura, ConoHa, Lightsail) | Yes | Yes | ~500-1,000 JPY/mo | Full control, docker-compose friendly, most reliable for SQLite |
-| Oracle Cloud Free Tier (ARM) | Yes | Yes | Free | Free-tier account stability is the unknown |
-| Fly.io | Paid volume | Sleep on free tier | Free/paid | Container-native but cold start hurts Tailscale UX |
-| Render | Paid disk | Sleep on free tier | Free/paid | Docker-supported, free tier not viable for SQLite |
-| Google Cloud Run | No (stateless) | Scale-to-zero | Pay-per-request | Poor fit for SQLite — would force Cloud SQL migration |
+| Platform | Filters met | Verdict |
+|----------|-------------|---------|
+| Oracle Cloud Free Tier (ARM Ampere A1) | All four | **Primary**. Truly free; 4 OCPU / 24 GB RAM / 200 GB block storage on Always Free. |
+| AWS Lightsail 1 GB | All four | **Fallback**. $5/mo (~¥750). Predictable, no account-stability concerns. |
+| Sakura VPS 1 GB | All four | Alternative fallback at ¥660/mo; kept as a third option if Lightsail's USD billing becomes unfavorable. |
+| Fly.io free tier | Always-on fails (auto-stop) | Rejected. |
+| Render free tier | Persistent disk requires paid plan | Rejected. |
+| Google Cloud Run | Stateless — no persistent filesystem | Rejected. Would force SQLite → Cloud SQL rewrite. |
+| Cloudflare Workers (Pyodide) | Single-container fails (per-request runtime); no filesystem | Rejected. Would force abandoning FastAPI + SQLAlchemy + SQLite. |
+| Self-host + Cloudflare Tunnel | All four, but requires existing 24/7 hardware | Rejected — no such hardware available. |
 
-Decision deferred until MVP is functional on localhost and hosting tradeoffs can be evaluated concretely.
+**Decision: Oracle Cloud Free Tier (ARM Ampere A1) is the primary target. Lightsail 1 GB is the fallback, activated if Oracle's ARM capacity cannot be obtained or the account is terminated.**
+
+Risks and mitigations:
+
+- **ARM Ampere capacity in Tokyo region has historically been scarce.** If creation fails, retry over several days or fall back to a nearer region (Osaka) before switching to Lightsail. Accept +10–50 ms latency if a foreign region is required.
+- **Oracle is documented to terminate Always Free accounts without stated cause.** Mitigation: the SQLite database is backed up on a schedule to an external store (e.g., object storage via `rclone`) so BAN recovery time is bounded by "provision Lightsail + restore last backup", not "reconstruct user data".
+- **Always Free resources can be reclaimed if underused.** Mitigation: actual usage (daily notifications, dashboard access) keeps the instance active; also applies to CPU-bound reclaim policy.
+
+## Open Questions
 
 ### Registry and tag strategy
 

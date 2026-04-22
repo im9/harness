@@ -1,4 +1,4 @@
-.PHONY: dev-up dev-down dev-status dev-logs help
+.PHONY: dev-up dev-down dev-status dev-logs totp help
 
 DEV_DIR        := .dev
 BACKEND_PID    := $(DEV_DIR)/backend.pid
@@ -8,12 +8,19 @@ FRONTEND_LOG   := $(DEV_DIR)/frontend.log
 BACKEND_PORT   := 8787
 FRONTEND_PORT  := 5787
 
+# Auto-load .env so `make dev-up` works without the caller exporting
+# HARNESS_JWT_SECRET / DATABASE_URL by hand each session. Missing .env is
+# fine — `-include` suppresses the "no such file" warning.
+-include .env
+export
+
 help:
 	@echo "Dev server targets:"
 	@echo "  make dev-up      Launch backend (:$(BACKEND_PORT)) + frontend (:$(FRONTEND_PORT)) in the background"
 	@echo "  make dev-down    Stop both"
 	@echo "  make dev-status  Report which ports are listening"
 	@echo "  make dev-logs    Tail both logs (Ctrl-C to exit)"
+	@echo "  make totp        Print the current 6-digit authenticator code for the DB user"
 
 dev-up:
 	@mkdir -p $(DEV_DIR)
@@ -65,3 +72,6 @@ dev-status:
 
 dev-logs:
 	@tail -F $(BACKEND_LOG) $(FRONTEND_LOG)
+
+totp:
+	@uv run python scripts/dev_totp.py

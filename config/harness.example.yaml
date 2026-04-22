@@ -1,0 +1,83 @@
+# Template for an OPTIONAL YAML seed file.
+#
+# The primary edit path for operator configuration is the in-app Settings
+# UI (`/settings`); values are persisted in the app's SQLite database.
+# This YAML format is supported only as a bootstrap/backup convenience:
+#
+#   harness config import config/harness.yaml   # seed DB from YAML
+#   harness config export config/harness.yaml   # dump DB to YAML
+#
+# All values here are structural placeholders. No value represents a
+# suggested or default choice — they describe the SHAPE the config takes,
+# not what the operator should pick.
+#
+# See docs/ai/adr/004-mvp-scope.md for architecture. Operator-private
+# notes live in docs/private/ (gitignored).
+
+# Instruments the cockpit tracks.
+# Empty list = engine produces no recommendations.
+instruments: []
+# Example entry shape (do not uncomment; replace in harness.yaml):
+# instruments:
+#   - symbol: ""              # vendor-specific instrument code
+#     display_name: ""        # short label for the UI
+#     tick_size: 0.0
+#     tick_value: 0.0          # P&L per tick per contract, in quote currency
+
+# Trading sessions to enable. Multiple sessions per day are allowed.
+# Engine emits recommendations only inside enabled sessions.
+sessions: []
+# Example entry shape:
+# sessions:
+#   - name: ""
+#     start: "HH:MM"
+#     end: "HH:MM"
+#     timezone: ""
+
+# Rule overlay. Values are null until the operator configures them; null
+# means "rule inactive", so an unfilled config runs with no rule enforcement.
+rule_overlay:
+  daily_loss_cap: null         # integer in quote currency; null = no cap
+  post_loss_cooldown:
+    mode: null                 # "until_next_day" | "fixed_window" | "none" | null
+    window_minutes: null       # only read when mode == "fixed_window"
+  override_requires_reason: true
+
+# Setup library. Empty list = no mechanical setups evaluated.
+# Each entry selects a setup kind by name (code defines the kinds) and
+# supplies its parameters.
+setups: []
+# Example entry shape:
+# setups:
+#   - kind: ""                 # identifier for a setup kind registered in code
+#     enabled: true
+#     params: {}               # kind-specific parameters
+
+# Macro event overlay. Window lengths are operator-configured.
+macro_overlay:
+  pre_event_minutes: null
+  event_window_minutes: null
+  post_event_minutes: null
+  size_multiplier_post_event: null    # e.g. 0.5 to halve recommended size
+  retreat_tightening_factor: null     # e.g. 0.7 to tighten stops
+
+# Data providers. Concrete vendor selection is operator-private; code
+# looks up an implementation class by `kind`.
+market_data:
+  kind: null                   # provider registry key
+  options: {}                  # provider-specific options
+
+event_calendar:
+  kind: null
+  options: {}
+  yaml_overrides_path: "data/macro-events.yml"   # local file, optional
+
+ai_chat:
+  enabled: false
+  kind: null                   # e.g. "gemini" | "anthropic"
+  model: null
+  api_key_env: null            # name of the env var holding the API key
+  system_prompt_path: null     # optional; default lives in code
+
+notifications:
+  webhook_url_env: null        # name of env var holding the webhook URL

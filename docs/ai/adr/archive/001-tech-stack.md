@@ -1,8 +1,6 @@
 # ADR 001: Tech Stack Selection
 
-## Status
-
-Accepted
+## Status: Implemented
 
 ## Context
 
@@ -132,7 +130,9 @@ Order: build a working local boilerplate, publish the repo and set up a local qu
 - [x] Auth — refresh token table + rotation + reuse detection
 - [x] Auth CLI: `harness init-auth` for initial credential setup
 - [x] Dev server wiring: Vite (port 5787) proxies `/api/*` to FastAPI (port 8787); `harness dev` launches uvicorn with autoreload. `/health` stays at root per liveness-probe convention.
-- [ ] Verify on localhost (login → dashboard)
+- [x] Backend: auth routes mounted under `/api/auth/*` (`POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`) plus `GET /api/me` for the current-user probe. Refresh cookie `Path=/api/auth` (covers login/refresh/logout in one scope) — a slight broadening of the `Path=/auth/refresh` note above; accepted to let logout also consume the refresh cookie without a second request shape.
+- [x] Frontend: React Router; `AuthProvider` probes `GET /api/me` on mount to classify session state; login form (username/password/TOTP); dashboard skeleton; `ProtectedRoute` redirects unauthenticated users to `/login`; shared `fetch` wrapper sends `credentials: 'include'` and transparently retries once via `POST /api/auth/refresh` on 401.
+- [x] Verify on localhost (login → dashboard)
 
 ## Consequences
 

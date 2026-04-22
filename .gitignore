@@ -35,6 +35,14 @@ node_modules/
 # Dev server PIDs / logs (Makefile dev-up)
 .dev/
 
+# Operator-private notes and config.
+# ADR 004 mandates that operator-specific values (loss thresholds,
+# instrument choices, session windows, vendor selection) are loaded at
+# runtime from config, never hardcoded. The operator's filled-in config
+# lives here and must never be committed.
+docs/private/
+config/harness.yaml
+
 # Editors
 .vscode/
 .idea/

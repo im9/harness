@@ -111,6 +111,22 @@ async def rotate(
     Raises InvalidRefreshToken on unknown / expired / replayed input. Replay
     of an already-revoked token revokes the entire family before raising.
     """
+    _, token = await rotate_with_user(session, presented, now=now)
+    return token
+
+
+async def rotate_with_user(
+    session: AsyncSession,
+    presented: str,
+    *,
+    now: datetime | None = None,
+) -> tuple[int, str]:
+    """Same as ``rotate`` but also returns the owning user_id.
+
+    Route handlers need the user_id to issue a fresh access token alongside
+    the rotated refresh token, and otherwise would have to re-query the new
+    row by hash to recover it.
+    """
     moment = now if now is not None else datetime.now(UTC)
     row = await _lookup(session, presented)
 
@@ -127,7 +143,8 @@ async def rotate(
 
     row.revoked_at = moment
     await session.flush()
-    return await issue(session, row.user_id, family_id=row.family_id, now=moment)
+    new_token = await issue(session, row.user_id, family_id=row.family_id, now=moment)
+    return row.user_id, new_token
 
 
 async def revoke_family(

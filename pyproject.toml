@@ -49,3 +49,9 @@ select = [
     "UP",  # pyupgrade
     "B",   # flake8-bugbear
 ]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI uses call-in-default as its dependency-injection and param-parser
+# idiom: `foo: T = Depends(...)` / `Cookie(...)`. Without this allowlist,
+# B008 fires on every route handler.
+extend-immutable-calls = ["fastapi.Cookie", "fastapi.Depends"]
