@@ -345,26 +345,20 @@ async def test_refresh_reuse_revokes_entire_family(
 
     # Attacker replays the stolen (now-revoked) token: must fail AND revoke
     # the family.
-    r_stolen = await _post_with_only_cookie(
-        client, "/api/auth/refresh", "refresh_token", stolen
-    )
+    r_stolen = await _post_with_only_cookie(client, "/api/auth/refresh", "refresh_token", stolen)
     assert r_stolen.status_code == 401
 
     # The legitimate fresh token must now also be dead. Without family-wide
     # revocation, the legitimate client would continue uninterrupted and the
     # theft would go undetected.
-    r_fresh = await _post_with_only_cookie(
-        client, "/api/auth/refresh", "refresh_token", fresh
-    )
+    r_fresh = await _post_with_only_cookie(client, "/api/auth/refresh", "refresh_token", fresh)
     assert r_fresh.status_code == 401
 
 
 # ---------- /api/auth/logout ----------
 
 
-async def test_logout_clears_both_cookies(
-    client: httpx.AsyncClient, seed: tuple[int, str]
-) -> None:
+async def test_logout_clears_both_cookies(client: httpx.AsyncClient, seed: tuple[int, str]) -> None:
     _, secret = seed
     await _login(client, secret)
     r = await client.post("/api/auth/logout")
