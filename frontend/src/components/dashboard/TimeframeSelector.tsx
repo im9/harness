@@ -36,7 +36,7 @@ export default function TimeframeSelector({ value, onChange }: TimeframeSelector
             aria-checked={selected}
             onClick={() => onChange(tf)}
             className={cn(
-              'rounded px-2 py-1 tabular-nums transition-colors',
+              'cursor-pointer rounded px-2 py-1 tabular-nums transition-colors',
               selected
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',

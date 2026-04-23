@@ -51,7 +51,13 @@ export default function PriceChart({
   const indicatorsRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map())
   const priceLinesRef = useRef<IPriceLine[]>([])
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
-  const fittedRef = useRef(false)
+  // Tracks the timestamp of `bars[0]` from the last render we fit. It
+  // changes whenever the series is replaced with one covering a
+  // different time range (i.e. timeframe switch), but stays constant
+  // across simple append updates. We use it as the trigger for an
+  // auto-fit: fit once on mount, re-fit when timeframe changes, and
+  // leave the user's zoom alone when only a new bar was appended.
+  const lastFirstBarTimeRef = useRef<number | null>(null)
   const hasBars = row.bars.length > 0
 
   // Create the chart once per mount (re-creation only if `height` or
@@ -95,7 +101,7 @@ export default function PriceChart({
     })
     chartRef.current = chart
     candlesRef.current = candles
-    fittedRef.current = false
+    lastFirstBarTimeRef.current = null
 
     const observer = new ResizeObserver(() => {
       chart.applyOptions({ width: container.clientWidth })
@@ -214,9 +220,10 @@ export default function PriceChart({
       markersRef.current?.setMarkers([])
     }
 
-    if (!fittedRef.current) {
+    const firstBarTime = row.bars[0]?.time ?? 0
+    if (lastFirstBarTimeRef.current !== firstBarTime) {
       chart.timeScale().fitContent()
-      fittedRef.current = true
+      lastFirstBarTimeRef.current = firstBarTime
     }
   }, [row])
 
