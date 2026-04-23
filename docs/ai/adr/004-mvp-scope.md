@@ -204,6 +204,23 @@ Top status strip (full width): today's P&L (Tremor `AreaChart`
 sparkline + the current number), session phase, next macro event +
 countdown.
 
+**Top strip pivot (planned, Phase 1).** The session-status strip as
+described above lands on the operator before the surrounding UI is
+built out enough to make those numbers legible — a standalone
+"-930" reads as opaque noise, not as trading state. The strip will
+therefore be replaced by a **Markets overview**: a read-only row of
+global benchmark indices (Nikkei 225, Dow Jones, Nasdaq 100, S&P
+500, USD/JPY) rendered as compact cards of `ticker · last ·
+pctChange`. These are cash indices, not tradeable by the operator
+— a distinct type `MarketIndex` (no `state`, no `setup`, no swap),
+kept separate from `Instrument` to prevent conflation. The
+`intradayPnl`, `sessionPhase`, and `nextMacroEvent` display
+surfaces are removed from Phase 1; the fields drop out of the
+payload and will return when the UI builds up enough context
+around them to give the values meaning. The macro vertical band on
+the chart (`InstrumentRowState.macro`) is unaffected — that window
+is per-instrument and independent of the top strip.
+
 ```
 ┌────────────────────────────────────────────┬─────────────────┐
 │ StatusStrip: P&L sparkline, phase, next macro event          │
