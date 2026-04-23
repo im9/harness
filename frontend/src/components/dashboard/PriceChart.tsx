@@ -1,5 +1,6 @@
 import {
   CandlestickSeries,
+  HistogramSeries,
   LineSeries,
   createChart,
   createSeriesMarkers,
@@ -50,6 +51,16 @@ const INDICATOR_FALLBACK_COLOR = '#94a3b8'
 // lineStyle values already in use for price lines.
 const LINE_STYLE_SOLID = 0
 const LINE_STYLE_DASHED = 2
+
+// Volume histogram colors are muted variants of the candle palette so
+// the pane reads as confirmation rather than competing with the price
+// pane for attention. Alpha is ~60% of the candle's.
+const VOLUME_UP_COLOR = 'rgba(16, 185, 129, 0.55)' // emerald-500 @ 55%
+const VOLUME_DOWN_COLOR = 'rgba(239, 68, 68, 0.55)' // red-500 @ 55%
+// Keep the volume pane compact — price stays dominant. 56px at the
+// default 240px container leaves ~180px for candles, preserving the
+// 2-rows-per-viewport budget discussed with the ADR 004 layout.
+const VOLUME_PANE_HEIGHT = 56
 function indicatorLineStyle(kind: IndicatorKind): number {
   return kind === 'vwap' ? LINE_STYLE_DASHED : LINE_STYLE_SOLID
 }
@@ -140,6 +151,7 @@ export default function PriceChart({
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candlesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const indicatorsRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map())
   const priceLinesRef = useRef<IPriceLine[]>([])
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
@@ -202,8 +214,27 @@ export default function PriceChart({
       wickDownColor: COLOR_DOWN,
       borderVisible: false,
     })
+    // Volume goes in a dedicated sub-pane (paneIndex 1). A separate
+    // priceScaleId keeps the histogram's axis independent from the
+    // candle price axis; `priceFormat: volume` tells lightweight-charts
+    // to drop cents and render thousands compactly.
+    const volume = chart.addSeries(
+      HistogramSeries,
+      {
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume',
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      1,
+    )
+    // Pin the pane height so the price pane keeps the majority of the
+    // container; without this, lightweight-charts splits panes ~50/50
+    // and candles compress too much.
+    chart.panes()[1]?.setHeight(VOLUME_PANE_HEIGHT)
     chartRef.current = chart
     candlesRef.current = candles
+    volumeRef.current = volume
     lastFirstBarTimeRef.current = null
 
     const observer = new ResizeObserver(() => {
@@ -239,6 +270,7 @@ export default function PriceChart({
       chart.remove()
       chartRef.current = null
       candlesRef.current = null
+      volumeRef.current = null
       indicators.clear()
       priceLines.length = 0
       markersRef.current = null
@@ -262,6 +294,17 @@ export default function PriceChart({
         high: b.high,
         low: b.low,
         close: b.close,
+      })),
+    )
+
+    // Per-bar volume with candle-direction coloring. Muted alpha keeps
+    // the histogram as a confirmation read rather than a competing
+    // signal against the price pane.
+    volumeRef.current?.setData(
+      row.bars.map((b) => ({
+        time: b.time as UTCTimestamp,
+        value: b.volume,
+        color: b.close >= b.open ? VOLUME_UP_COLOR : VOLUME_DOWN_COLOR,
       })),
     )
 

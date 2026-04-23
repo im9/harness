@@ -42,6 +42,7 @@ vi.mock('lightweight-charts', () => ({
       subscribeVisibleTimeRangeChange: vi.fn(),
       unsubscribeVisibleTimeRangeChange: vi.fn(),
     }),
+    panes: () => [{ setHeight: vi.fn() }, { setHeight: vi.fn() }],
     applyOptions: vi.fn(),
     remove: removeChart,
   })),
@@ -50,6 +51,7 @@ vi.mock('lightweight-charts', () => ({
     return { setMarkers: vi.fn(), detach: vi.fn() }
   },
   CandlestickSeries: { __tag: 'Candlestick' },
+  HistogramSeries: { __tag: 'Histogram' },
   LineSeries: { __tag: 'Line' },
 }))
 
@@ -77,9 +79,9 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
     lastPriceAt: '2026-04-23T09:45:00Z',
     macro: null,
     bars: [
-      { time: 1_777_000_000, open: 17_580, high: 17_585, low: 17_579, close: 17_583 },
-      { time: 1_777_000_060, open: 17_583, high: 17_590, low: 17_582, close: 17_589 },
-      { time: 1_777_000_120, open: 17_589, high: 17_592, low: 17_580, close: 17_582.25 },
+      { time: 1_777_000_000, open: 17_580, high: 17_585, low: 17_579, close: 17_583, volume: 420 },
+      { time: 1_777_000_060, open: 17_583, high: 17_590, low: 17_582, close: 17_589, volume: 680 },
+      { time: 1_777_000_120, open: 17_589, high: 17_592, low: 17_580, close: 17_582.25, volume: 510 },
     ],
     indicators: [],
   }
@@ -115,7 +117,10 @@ describe('PriceChart', () => {
   it('feeds the mock bars into a candlestick series', () => {
     render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row()} />)
     expect(addSeries).toHaveBeenCalled()
-    expect(setData).toHaveBeenCalledTimes(1)
+    // Two setData calls on mount with the default fixture: one for the
+    // candlestick series, one for the volume histogram in the second
+    // pane (indicators are absent in the default row()).
+    expect(setData).toHaveBeenCalledTimes(2)
     // The component re-shapes our Bar type into the lightweight-charts
     // CandlestickData shape (adds `time` as a UTCTimestamp). Asserting
     // on the length pins the pipe without coupling to property order.
@@ -292,14 +297,46 @@ describe('PriceChart', () => {
       ],
     })
     render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={fixture} />)
-    // Candles + N indicators → 1 + N addSeries calls. Inspecting the
-    // first argument's __tag lets us verify the second series is a
-    // LineSeries (indicator) rather than another CandlestickSeries —
-    // the shape of the payload-to-chart mapping.
-    expect(addSeries).toHaveBeenCalledTimes(3)
+    // Candles + volume histogram + N indicators → 2 + N addSeries calls.
+    // Inspecting the first argument's __tag verifies the payload-to-chart
+    // mapping: candlestick and histogram are created up front in the
+    // mount effect, then line series are appended per indicator in the
+    // data-update effect.
+    expect(addSeries).toHaveBeenCalledTimes(4)
     const tags = addSeries.mock.calls.map(
       (call) => (call[0] as { __tag: string }).__tag,
     )
-    expect(tags).toEqual(['Candlestick', 'Line', 'Line'])
+    expect(tags).toEqual(['Candlestick', 'Histogram', 'Line', 'Line'])
+  })
+
+  it('adds a histogram series in a second pane for volume', () => {
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row()} />)
+    // lightweight-charts v5 addSeries signature is (type, options,
+    // paneIndex). paneIndex 1 puts the histogram in a dedicated
+    // sub-pane below the price pane per ADR 004 dashboard spec.
+    const histogramCall = addSeries.mock.calls.find(
+      (call) => (call[0] as { __tag: string }).__tag === 'Histogram',
+    )
+    expect(histogramCall).toBeDefined()
+    expect(histogramCall?.[2]).toBe(1)
+  })
+
+  it('feeds volume values into the histogram series', () => {
+    const fixture = row({
+      bars: [
+        { time: 1_777_000_000, open: 100, high: 101, low: 99, close: 100.5, volume: 500 },
+        { time: 1_777_000_060, open: 100.5, high: 102, low: 100, close: 101.5, volume: 750 },
+      ],
+    })
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={fixture} />)
+    // Pin the volume setData call by looking at the `value` field, which
+    // is histogram-shaped (not OHLC). Confirms the volume pipe copies
+    // payload volumes through rather than recomputing or omitting them.
+    const volumeCall = setData.mock.calls.find((call) => {
+      const first = (call[0] as { value?: number }[])[0]
+      return first?.value === 500
+    })
+    expect(volumeCall).toBeDefined()
+    expect((volumeCall?.[0] as unknown[]).length).toBe(2)
   })
 })

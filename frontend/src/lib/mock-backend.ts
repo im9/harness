@@ -110,12 +110,17 @@ function advanceSeries(
     const close = open + (rand() - 0.5) * volatility * 2
     const high = Math.max(open, close) + rand() * volatility
     const low = Math.min(open, close) - rand() * volatility
+    const range = Math.max(high - low, tickSize)
     const bar: Bar = {
       time: nextTime,
       open: round(open, tickSize),
       high: round(high, tickSize),
       low: round(low, tickSize),
       close: round(close, tickSize),
+      // Same range-anchored formula as generateBars so the appended
+      // bars' volume distribution doesn't visibly shift at the seam
+      // between seeded history and live append.
+      volume: Math.round(400 + range * 80 + rand() * 300),
     }
     bars.push(bar)
     last = bar

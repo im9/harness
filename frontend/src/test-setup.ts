@@ -35,6 +35,7 @@ vi.mock('lightweight-charts', () => {
     setMarkers: vi.fn(),
     detach: vi.fn(),
   })
+  const makePane = () => ({ setHeight: vi.fn() })
   const makeChart = () => ({
     addSeries: vi.fn(() => makeSeries()),
     removeSeries: vi.fn(),
@@ -47,6 +48,7 @@ vi.mock('lightweight-charts', () => {
       subscribeVisibleTimeRangeChange: vi.fn(),
       unsubscribeVisibleTimeRangeChange: vi.fn(),
     })),
+    panes: vi.fn(() => [makePane(), makePane()]),
     applyOptions: vi.fn(),
     remove: vi.fn(),
   })
@@ -54,6 +56,7 @@ vi.mock('lightweight-charts', () => {
     createChart: vi.fn(() => makeChart()),
     createSeriesMarkers: vi.fn(() => makeMarkersPlugin()),
     CandlestickSeries: { __tag: 'Candlestick' },
+    HistogramSeries: { __tag: 'Histogram' },
     LineSeries: { __tag: 'Line' },
   }
 })

@@ -212,7 +212,7 @@ mock-first against the payload contract; backend follows.
         `StateBanner`, `RuleGauge` (Tremor `CategoryBar`), and
         `StatusStrip` (Tremor `AreaChart`). Chart slot is a
         placeholder pending (b).
-  - [ ] (b) `lightweight-charts` price and volume panes with
+  - [x] (b) `lightweight-charts` price and volume panes with
         annotations:
     - [x] Per-row timeframe switcher
     - [x] Target / retreat price lines
@@ -220,7 +220,7 @@ mock-first against the payload contract; backend follows.
     - [x] VWAP dashed line
     - [x] Macro event vertical band
     - [x] Setup range shading
-    - [ ] Volume pane
+    - [x] Volume pane
   - [ ] Wire to the real `GET /api/dashboard` /
         `WebSocket /ws/dashboard` payload.
 - [ ] Frontend: AI chat drawer (SSE consumer, cross-link to chart

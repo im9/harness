@@ -49,12 +49,20 @@ export function generateBars(
     const close = open + (rand() - 0.5) * volatility * 2
     const high = Math.max(open, close) + rand() * volatility
     const low = Math.min(open, close) - rand() * volatility
+    // Volume is loosely correlated with the bar's range — wider bars
+    // usually carry more contracts in real markets, and mirroring that
+    // here keeps the histogram reading like a "confirmation" signal
+    // rather than pure noise. Base 400 + range-proportional scale +
+    // uniform jitter. Rounded to integers since contracts are discrete.
+    const range = Math.max(high - low, tickSize)
+    const volume = Math.round(400 + range * 80 + rand() * 300)
     bars.push({
       time: startTime + i * stepSec,
       open: round(open, tickSize),
       high: round(high, tickSize),
       low: round(low, tickSize),
       close: round(close, tickSize),
+      volume,
     })
     price = close
   }

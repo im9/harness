@@ -37,8 +37,8 @@ function seed(): DashboardPayload {
         lastPriceAt: new Date(t0 * 1000).toISOString(),
         macro: null,
         bars: [
-          { time: t0, open: 100, high: 101, low: 99.5, close: 100.5 },
-          { time: t0 + 60, open: 100.5, high: 101, low: 100, close: 100 },
+          { time: t0, open: 100, high: 101, low: 99.5, close: 100.5, volume: 420 },
+          { time: t0 + 60, open: 100.5, high: 101, low: 100, close: 100, volume: 380 },
         ],
         indicators: [
           {
