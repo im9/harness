@@ -11,7 +11,11 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts'
 import { useEffect, useRef } from 'react'
-import type { InstrumentRowState, Timeframe } from '@/lib/dashboard-types'
+import type {
+  IndicatorKind,
+  InstrumentRowState,
+  Timeframe,
+} from '@/lib/dashboard-types'
 import TimeframeSelector from './TimeframeSelector'
 
 interface PriceChartProps {
@@ -39,6 +43,47 @@ const INDICATOR_COLOR: Record<string, string> = {
 }
 const INDICATOR_FALLBACK_COLOR = '#94a3b8'
 
+// lightweight-charts LineStyle enum: Solid = 0, Dashed = 2. VWAP is
+// drawn dashed per ADR 004 dashboard spec; EMAs and other trend lines
+// stay solid. Using the numeric literal keeps parity with the raw
+// lineStyle values already in use for price lines.
+const LINE_STYLE_SOLID = 0
+const LINE_STYLE_DASHED = 2
+function indicatorLineStyle(kind: IndicatorKind): number {
+  return kind === 'vwap' ? LINE_STYLE_DASHED : LINE_STYLE_SOLID
+}
+
+// Positions the macro-event overlay div between two timestamps on the
+// chart's horizontal axis. Null `window` (no active event) collapses
+// the band to width 0; null pixel coordinates (the window is off
+// screen or the chart has no pixel for them yet) do the same. The
+// element stays mounted in both cases so React owns its lifecycle and
+// the overlay can re-appear on the next render without a remount.
+function positionMacroBand(
+  chart: IChartApi,
+  band: HTMLDivElement | null,
+  window: { start: number; end: number } | null,
+): void {
+  if (!band) return
+  if (!window) {
+    band.style.left = '0px'
+    band.style.width = '0px'
+    return
+  }
+  const scale = chart.timeScale()
+  const xStart = scale.timeToCoordinate(window.start as UTCTimestamp)
+  const xEnd = scale.timeToCoordinate(window.end as UTCTimestamp)
+  if (xStart == null || xEnd == null) {
+    band.style.left = '0px'
+    band.style.width = '0px'
+    return
+  }
+  const left = Math.min(xStart, xEnd)
+  const width = Math.max(1, Math.abs(xEnd - xStart))
+  band.style.left = `${left}px`
+  band.style.width = `${width}px`
+}
+
 export default function PriceChart({
   row,
   timeframe,
@@ -51,6 +96,11 @@ export default function PriceChart({
   const indicatorsRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map())
   const priceLinesRef = useRef<IPriceLine[]>([])
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
+  const macroBandRef = useRef<HTMLDivElement>(null)
+  // Captured seconds-since-epoch window, re-set on every row payload
+  // so the visible-range subscriber (which fires on pan / zoom without
+  // a fresh snapshot) repositions against the current macro event.
+  const macroWindowRef = useRef<{ start: number; end: number } | null>(null)
   // Tracks the timestamp of `bars[0]` from the last render we fit. It
   // changes whenever the series is replaced with one covering a
   // different time range (i.e. timeframe switch), but stays constant
@@ -105,11 +155,20 @@ export default function PriceChart({
 
     const observer = new ResizeObserver(() => {
       chart.applyOptions({ width: container.clientWidth })
+      positionMacroBand(chart, macroBandRef.current, macroWindowRef.current)
     })
     observer.observe(container)
 
+    // Follow pan / zoom so the macro band doesn't drift off its window
+    // between SSE snapshots.
+    const onVisibleRangeChange = () => {
+      positionMacroBand(chart, macroBandRef.current, macroWindowRef.current)
+    }
+    chart.timeScale().subscribeVisibleTimeRangeChange(onVisibleRangeChange)
+
     return () => {
       observer.disconnect()
+      chart.timeScale().unsubscribeVisibleTimeRangeChange(onVisibleRangeChange)
       chart.remove()
       chartRef.current = null
       candlesRef.current = null
@@ -149,6 +208,7 @@ export default function PriceChart({
         series = chart.addSeries(LineSeries, {
           color: INDICATOR_COLOR[indicator.name] ?? INDICATOR_FALLBACK_COLOR,
           lineWidth: 2,
+          lineStyle: indicatorLineStyle(indicator.kind),
           priceLineVisible: false,
           lastValueVisible: false,
           title: indicator.name,
@@ -225,6 +285,14 @@ export default function PriceChart({
       chart.timeScale().fitContent()
       lastFirstBarTimeRef.current = firstBarTime
     }
+
+    macroWindowRef.current = row.macro
+      ? {
+          start: Math.floor(Date.parse(row.macro.startsAt) / 1000),
+          end: Math.floor(Date.parse(row.macro.endsAt) / 1000),
+        }
+      : null
+    positionMacroBand(chart, macroBandRef.current, macroWindowRef.current)
   }, [row])
 
   if (!hasBars) {
@@ -250,13 +318,22 @@ export default function PriceChart({
       <div className="flex justify-end">
         <TimeframeSelector value={timeframe} onChange={onTimeframeChange} />
       </div>
-      <div
-        ref={containerRef}
-        aria-label={`${row.instrument.displayName} price chart`}
-        role="img"
-        className="border-border bg-card/40 overflow-hidden rounded-md border"
-        style={{ height }}
-      />
+      <div className="border-border bg-card/40 relative overflow-hidden rounded-md border">
+        <div
+          ref={containerRef}
+          aria-label={`${row.instrument.displayName} price chart`}
+          role="img"
+          style={{ height }}
+        />
+        {row.macro && (
+          <div
+            ref={macroBandRef}
+            aria-label={`macro event window · ${row.macro.eventName}`}
+            className="pointer-events-none absolute inset-y-0 border-x border-amber-500/40 bg-amber-500/10"
+            style={{ left: 0, width: 0 }}
+          />
+        )}
+      </div>
     </div>
   )
 }

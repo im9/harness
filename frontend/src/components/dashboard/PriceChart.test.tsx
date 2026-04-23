@@ -35,7 +35,12 @@ vi.mock('lightweight-charts', () => ({
       }
     },
     removeSeries: vi.fn(),
-    timeScale: () => ({ fitContent: vi.fn() }),
+    timeScale: () => ({
+      fitContent: vi.fn(),
+      timeToCoordinate: vi.fn(() => null),
+      subscribeVisibleTimeRangeChange: vi.fn(),
+      unsubscribeVisibleTimeRangeChange: vi.fn(),
+    }),
     applyOptions: vi.fn(),
     remove: removeChart,
   })),
@@ -156,6 +161,63 @@ describe('PriceChart', () => {
     // Lightweight-charts happily accepts an empty series but an empty
     // chart is a silent regression signal — the placeholder surfaces it.
     expect(screen.getByText(/no price data/i)).toBeInTheDocument()
+  })
+
+  it('renders VWAP as a dashed line while other indicators stay solid', () => {
+    const fixture = row({
+      indicators: [
+        {
+          name: 'VWAP',
+          kind: 'vwap',
+          points: [
+            { time: 1_777_000_000, value: 17_581 },
+            { time: 1_777_000_060, value: 17_584 },
+          ],
+        },
+        {
+          name: 'EMA20',
+          kind: 'ema',
+          points: [
+            { time: 1_777_000_000, value: 17_580 },
+            { time: 1_777_000_060, value: 17_583 },
+          ],
+        },
+      ],
+    })
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={fixture} />)
+    // lightweight-charts LineStyle enum: Solid = 0, Dashed = 2.
+    // ADR 004 dashboard spec calls the VWAP line out as dashed to set
+    // it apart from the solid-drawn EMAs.
+    const options = new Map<string, { lineStyle?: number }>()
+    for (const call of addSeries.mock.calls) {
+      const opts = call[1] as { title?: string; lineStyle?: number } | undefined
+      if (opts?.title) options.set(opts.title, opts)
+    }
+    expect(options.get('VWAP')?.lineStyle).toBe(2)
+    expect(options.get('EMA20')?.lineStyle ?? 0).toBe(0)
+  })
+
+  it('renders a macro event band when the row is in an event window', () => {
+    const fixture = row({
+      macro: {
+        eventName: 'Macro release A',
+        impactTier: 'high',
+        phase: 'event',
+        startsAt: '2026-04-23T09:45:00Z',
+        endsAt: '2026-04-23T09:50:00Z',
+      },
+    })
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={fixture} />)
+    // Vertical band surfaces the active macro-event window (ADR 004
+    // dashboard spec). Presence is the accessibility-visible anchor;
+    // exact pixel placement depends on the real timeScale and is
+    // covered in manual browser verification, not jsdom.
+    expect(screen.getByLabelText(/macro event window/i)).toBeInTheDocument()
+  })
+
+  it('omits the macro band when macro is null', () => {
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row({ macro: null })} />)
+    expect(screen.queryByLabelText(/macro event window/i)).not.toBeInTheDocument()
   })
 
   it('adds one line series per payload indicator alongside the candles', () => {

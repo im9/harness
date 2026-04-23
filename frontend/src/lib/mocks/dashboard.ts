@@ -89,6 +89,21 @@ export function emaPair(bars: Bar[]): IndicatorLine[] {
   ]
 }
 
+export function computeVwap(bars: Bar[]): IndicatorPoint[] {
+  // Typical-price running mean as a stand-in for true VWAP. The
+  // payload's Bar type carries no volume yet (deferred with the volume
+  // pane), so every bar weights equally and this degenerates to a
+  // cumulative SMA of (H + L + C) / 3. Good enough to render a
+  // distinct mid-level reference line for the mock dashboard; a real
+  // vendor adapter will supply proper volume-weighted values.
+  let sum = 0
+  return bars.map((bar, i) => {
+    const typical = (bar.high + bar.low + bar.close) / 3
+    sum += typical
+    return { time: bar.time, value: Math.round((sum / (i + 1)) * 100) / 100 }
+  })
+}
+
 // End the bar history at *now* so the initial chart is anchored to the
 // operator's wall clock. Without this, a fixed fixture date leaves the
 // dashboard looking frozen (either no bars appended when wall < fixture
@@ -102,6 +117,18 @@ const BAR_COUNT = 120
 const BAR_STEP_SEC = 10
 const END_ISO = new Date(END_TIME_SEC * 1000).toISOString()
 const NEXT_EVENT_ISO = new Date((END_TIME_SEC + 3 * 60 * 60) * 1000).toISOString()
+
+// Active macro window centered on the current wall clock — half the
+// window sits in-frame, half just-before. Exists so the mock dashboard
+// demonstrates the vertical band overlay without needing the operator
+// to wait for a scheduled release to land.
+const MACRO_WINDOW_HALF_SEC = 3 * 60
+const MACRO_START_ISO = new Date(
+  (END_TIME_SEC - MACRO_WINDOW_HALF_SEC) * 1000,
+).toISOString()
+const MACRO_END_ISO = new Date(
+  (END_TIME_SEC + MACRO_WINDOW_HALF_SEC) * 1000,
+).toISOString()
 
 function intradayPnlCurve(): { t: string; pnl: number }[] {
   // 5-min buckets across a 6-hour session. Values are hand-authored to
@@ -199,9 +226,18 @@ export const dashboardDefault: DashboardPayload = {
       },
       lastPrice: 4_829.75,
       lastPriceAt: END_ISO,
-      macro: null,
+      macro: {
+        eventName: 'Macro release A',
+        impactTier: 'high',
+        phase: 'event',
+        startsAt: MACRO_START_ISO,
+        endsAt: MACRO_END_ISO,
+      },
       bars: FUT_B_BARS,
-      indicators: emaPair(FUT_B_BARS),
+      indicators: [
+        ...emaPair(FUT_B_BARS),
+        { name: 'VWAP', kind: 'vwap', points: computeVwap(FUT_B_BARS) },
+      ],
     },
   ],
 }

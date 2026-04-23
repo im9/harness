@@ -34,7 +34,15 @@ vi.mock('lightweight-charts', () => {
   const makeChart = () => ({
     addSeries: vi.fn(() => makeSeries()),
     removeSeries: vi.fn(),
-    timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
+    timeScale: vi.fn(() => ({
+      fitContent: vi.fn(),
+      // Always null in jsdom — no real canvas, so there is no pixel to
+      // coordinate with. The macro-band overlay tolerates null and stays
+      // collapsed; its mere presence in the DOM is what tests assert on.
+      timeToCoordinate: vi.fn(() => null),
+      subscribeVisibleTimeRangeChange: vi.fn(),
+      unsubscribeVisibleTimeRangeChange: vi.fn(),
+    })),
     applyOptions: vi.fn(),
     remove: vi.fn(),
   })
