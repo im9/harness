@@ -57,8 +57,8 @@ describe('AppShell', () => {
 
     await screen.findByTestId('outlet-content')
     // Test targets the accessible landmark name rather than a class name so it
-    // survives the ADR 004 cockpit redesign that will fill this nav with real
-    // links.
+    // survives the ADR 004 dashboard redesign that will fill this nav with
+    // real links.
     expect(screen.getByRole('navigation', { name: /primary/i })).toBeInTheDocument()
   })
 

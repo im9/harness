@@ -22,7 +22,7 @@ function prefersLight(): boolean {
 
 /**
  * Precedence: localStorage > prefers-color-scheme > dark.
- * Dark is the ADR 003 default (reduced glare during long cockpit sessions).
+ * Dark is the ADR 003 default (reduced glare during long trading sessions).
  *
  * Not used at runtime by <html>-class hydration — index.html already runs an
  * inline version of this policy before React mounts. Exported for tests and

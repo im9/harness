@@ -9,7 +9,7 @@ export default function NotFound() {
         The route you followed isn&apos;t wired up.
       </p>
       <Button asChild>
-        <Link to="/">Back to cockpit</Link>
+        <Link to="/">Back to dashboard</Link>
       </Button>
     </div>
   )

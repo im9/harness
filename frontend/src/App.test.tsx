@@ -89,11 +89,17 @@ describe('App routing', () => {
 
     renderAt('/')
 
-    // Dashboard distinguishes itself from Login by showing "Signed in as
-    // <username>" — both pages share the <h1>harness</h1>, so matching on
-    // h1 alone would be ambiguous.
-    expect(await screen.findByText(/signed in as/i)).toBeInTheDocument()
-    expect(screen.getByText('alice')).toBeInTheDocument()
+    // The dashboard page exposes a "Session status" landmark as its top
+    // frame (ADR 004 StatusStrip). Matching on the landmark — rather than
+    // a piece of visible text — keeps this test stable across the layout
+    // work still to land in slices (b)–(d).
+    expect(
+      await screen.findByRole('region', { name: /session status/i }),
+    ).toBeInTheDocument()
+    // AppShell surfaces the signed-in user via an aria-labelled avatar.
+    // Asserting that confirms the protected shell resolved auth before
+    // mounting the dashboard.
+    expect(screen.getByLabelText(/signed in as alice/i)).toBeInTheDocument()
   })
 
   it('submitting the login form moves the user to the dashboard', async () => {
@@ -110,11 +116,11 @@ describe('App routing', () => {
     await user.type(screen.getByLabelText(/authenticator code/i), '123456')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
-    // End-to-end contract: a successful login transitions the router to the
-    // dashboard. This catches regressions where either the form doesn't
+    // End-to-end contract: a successful login transitions the router to
+    // the dashboard. This catches regressions where either the form doesn't
     // submit, login doesn't update AuthContext, or the redirect is missing.
     await waitFor(() => {
-      expect(screen.getByText(/signed in as/i)).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: /session status/i })).toBeInTheDocument()
     })
   })
 
@@ -148,7 +154,7 @@ describe('App routing', () => {
       .mockResolvedValueOnce(jsonResponse(204)) // logout
 
     renderAt('/')
-    await screen.findByText(/signed in as/i)
+    await screen.findByRole('region', { name: /session status/i })
 
     await user.click(screen.getByRole('button', { name: /sign out/i }))
 
@@ -156,6 +162,6 @@ describe('App routing', () => {
     // Checking both sides avoids a false pass where logout tears down state
     // but the router forgets to navigate away.
     expect(await screen.findByRole('form', { name: /sign in/i })).toBeInTheDocument()
-    expect(screen.queryByText(/signed in as/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /session status/i })).not.toBeInTheDocument()
   })
 })
