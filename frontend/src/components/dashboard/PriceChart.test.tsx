@@ -25,14 +25,26 @@ vi.mock('lightweight-charts', () => ({
   createChart: vi.fn(() => ({
     addSeries: (...args: unknown[]) => {
       addSeries(...args)
-      return { setData, createPriceLine }
+      return {
+        setData,
+        createPriceLine: (...pargs: unknown[]) => {
+          createPriceLine(...pargs)
+          return { applyOptions: vi.fn() }
+        },
+        removePriceLine: vi.fn(),
+      }
     },
+    removeSeries: vi.fn(),
     timeScale: () => ({ fitContent: vi.fn() }),
     applyOptions: vi.fn(),
     remove: removeChart,
   })),
-  createSeriesMarkers,
-  CandlestickSeries: { __tag: 'CandlestickSeries' },
+  createSeriesMarkers: (...args: unknown[]) => {
+    createSeriesMarkers(...args)
+    return { setMarkers: vi.fn(), detach: vi.fn() }
+  },
+  CandlestickSeries: { __tag: 'Candlestick' },
+  LineSeries: { __tag: 'Line' },
 }))
 
 import PriceChart from './PriceChart'
@@ -62,6 +74,7 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
       { time: 1_777_000_060, open: 17_583, high: 17_590, low: 17_582, close: 17_589 },
       { time: 1_777_000_120, open: 17_589, high: 17_592, low: 17_580, close: 17_582.25 },
     ],
+    indicators: [],
   }
   return { ...base, ...overrides }
 }
@@ -84,7 +97,7 @@ afterEach(() => {
 
 describe('PriceChart', () => {
   it('renders a chart container labeled by the instrument display name', () => {
-    render(<PriceChart row={row()} />)
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row()} />)
     // Accessible name lets screen readers distinguish which instrument's
     // chart they are focused on when the page has multiple rows stacked.
     expect(
@@ -93,7 +106,7 @@ describe('PriceChart', () => {
   })
 
   it('feeds the mock bars into a candlestick series', () => {
-    render(<PriceChart row={row()} />)
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row()} />)
     expect(addSeries).toHaveBeenCalled()
     expect(setData).toHaveBeenCalledTimes(1)
     // The component re-shapes our Bar type into the lightweight-charts
@@ -104,7 +117,7 @@ describe('PriceChart', () => {
   })
 
   it('draws target and retreat price lines when a setup is active', () => {
-    render(<PriceChart row={row()} />)
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row()} />)
     // One call per level. The specific color / line-style are visual
     // choices covered by the component body, not the test.
     expect(createPriceLine).toHaveBeenCalledTimes(2)
@@ -116,32 +129,65 @@ describe('PriceChart', () => {
   })
 
   it('does not draw price lines when no setup is active', () => {
-    render(<PriceChart row={row({ setup: null })} />)
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row({ setup: null })} />)
     expect(createPriceLine).not.toHaveBeenCalled()
   })
 
   it('places a trigger marker on the last bar when state is ENTER', () => {
-    render(<PriceChart row={row({ state: 'ENTER' })} />)
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row({ state: 'ENTER' })} />)
     // The marker cross-references the state banner — ENTER announcements
     // and a visible chart arrow must land together to pass a glance test.
     expect(createSeriesMarkers).toHaveBeenCalledTimes(1)
   })
 
   it('skips markers when the state does not warrant one', () => {
-    render(<PriceChart row={row({ state: 'HOLD' })} />)
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row({ state: 'HOLD' })} />)
     expect(createSeriesMarkers).not.toHaveBeenCalled()
   })
 
   it('tears the chart down on unmount', () => {
-    const { unmount } = render(<PriceChart row={row()} />)
+    const { unmount } = render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row()} />)
     unmount()
     expect(removeChart).toHaveBeenCalledTimes(1)
   })
 
   it('renders an empty-state message when no bars are available', () => {
-    render(<PriceChart row={row({ bars: [] })} />)
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row({ bars: [] })} />)
     // Lightweight-charts happily accepts an empty series but an empty
     // chart is a silent regression signal — the placeholder surfaces it.
     expect(screen.getByText(/no price data/i)).toBeInTheDocument()
+  })
+
+  it('adds one line series per payload indicator alongside the candles', () => {
+    const fixture = row({
+      indicators: [
+        {
+          name: 'EMA20',
+          kind: 'ema',
+          points: [
+            { time: 1_777_000_000, value: 17_580 },
+            { time: 1_777_000_060, value: 17_583 },
+          ],
+        },
+        {
+          name: 'EMA50',
+          kind: 'ema',
+          points: [
+            { time: 1_777_000_000, value: 17_585 },
+            { time: 1_777_000_060, value: 17_586 },
+          ],
+        },
+      ],
+    })
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={fixture} />)
+    // Candles + N indicators → 1 + N addSeries calls. Inspecting the
+    // first argument's __tag lets us verify the second series is a
+    // LineSeries (indicator) rather than another CandlestickSeries —
+    // the shape of the payload-to-chart mapping.
+    expect(addSeries).toHaveBeenCalledTimes(3)
+    const tags = addSeries.mock.calls.map(
+      (call) => (call[0] as { __tag: string }).__tag,
+    )
+    expect(tags).toEqual(['Candlestick', 'Line', 'Line'])
   })
 })

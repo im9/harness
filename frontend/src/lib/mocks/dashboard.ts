@@ -1,4 +1,9 @@
-import type { Bar, DashboardPayload } from '../dashboard-types'
+import type {
+  Bar,
+  DashboardPayload,
+  IndicatorLine,
+  IndicatorPoint,
+} from '../dashboard-types'
 
 // Deterministic dashboard scenarios for the mock-first UI build (ADR 004
 // development providers strategy). Each scenario is a fully-formed
@@ -9,7 +14,7 @@ import type { Bar, DashboardPayload } from '../dashboard-types'
 // placeholders — no references to real instruments or the operator's
 // tracked universe (CLAUDE.md privacy rule).
 
-function seededRandom(seed: number): () => number {
+export function seededRandom(seed: number): () => number {
   // Linear congruential generator (Numerical Recipes constants).
   // Used for deterministic mock data only — never for anything that
   // resembles real randomness.
@@ -20,12 +25,12 @@ function seededRandom(seed: number): () => number {
   }
 }
 
-function round(n: number, tickSize: number): number {
+export function round(n: number, tickSize: number): number {
   const ticks = Math.round(n / tickSize)
   return Math.round(ticks * tickSize * 100) / 100
 }
 
-function generateBars(
+export function generateBars(
   seed: number,
   count: number,
   centerPrice: number,
@@ -63,9 +68,40 @@ function generateBars(
   return bars
 }
 
-const END_TIME_SEC = Math.floor(new Date('2026-04-23T09:45:00Z').getTime() / 1000)
-const BAR_COUNT = 60
-const BAR_STEP_SEC = 60
+export function computeEma(bars: Bar[], period: number): IndicatorPoint[] {
+  // Standard EMA recurrence: EMA_t = close_t * k + EMA_{t-1} * (1 - k)
+  // with smoothing factor k = 2 / (period + 1). Seeded with the first
+  // close — acceptable for display; a backtest-grade engine would seed
+  // with the SMA of the first `period` closes instead.
+  if (bars.length === 0) return []
+  const k = 2 / (period + 1)
+  let ema = bars[0].close
+  return bars.map((bar) => {
+    ema = bar.close * k + ema * (1 - k)
+    return { time: bar.time, value: Math.round(ema * 100) / 100 }
+  })
+}
+
+export function emaPair(bars: Bar[]): IndicatorLine[] {
+  return [
+    { name: 'EMA20', kind: 'ema', points: computeEma(bars, 20) },
+    { name: 'EMA50', kind: 'ema', points: computeEma(bars, 50) },
+  ]
+}
+
+// End the bar history at *now* so the initial chart is anchored to the
+// operator's wall clock. Without this, a fixed fixture date leaves the
+// dashboard looking frozen (either no bars appended when wall < fixture
+// time, or a huge backfill followed by a stall when wall > fixture time).
+// Re-evaluated at module load, which happens once per browser session.
+const END_TIME_SEC = Math.floor(Date.now() / 1000)
+// Demo cadence, not a realism claim: 10 s / bar makes chart movement
+// readable during a short manual session. Swap to 60 (one-minute bars)
+// when we start benchmarking against real vendor feeds.
+const BAR_COUNT = 120
+const BAR_STEP_SEC = 10
+const END_ISO = new Date(END_TIME_SEC * 1000).toISOString()
+const NEXT_EVENT_ISO = new Date((END_TIME_SEC + 3 * 60 * 60) * 1000).toISOString()
 
 function intradayPnlCurve(): { t: string; pnl: number }[] {
   // 5-min buckets across a 6-hour session. Values are hand-authored to
@@ -84,12 +120,34 @@ function intradayPnlCurve(): { t: string; pnl: number }[] {
   })
 }
 
+const FUT_A_BARS = generateBars(
+  1337,
+  BAR_COUNT,
+  17_570,
+  17_582.25,
+  6,
+  0.25,
+  END_TIME_SEC,
+  BAR_STEP_SEC,
+)
+
+const FUT_B_BARS = generateBars(
+  4242,
+  BAR_COUNT,
+  4_830,
+  4_829.75,
+  2.5,
+  0.5,
+  END_TIME_SEC,
+  BAR_STEP_SEC,
+)
+
 export const dashboardDefault: DashboardPayload = {
   sessionPhase: 'open',
   nextMacroEvent: {
     eventName: 'Macro release A',
     impactTier: 'high',
-    at: '2026-04-23T13:30:00Z',
+    at: NEXT_EVENT_ISO,
   },
   intradayPnl: intradayPnlCurve(),
   rule: {
@@ -118,18 +176,10 @@ export const dashboardDefault: DashboardPayload = {
         rMultiple: 0.4,
       },
       lastPrice: 17_582.25,
-      lastPriceAt: '2026-04-23T09:45:00Z',
+      lastPriceAt: END_ISO,
       macro: null,
-      bars: generateBars(
-        1337,
-        BAR_COUNT,
-        17_570,
-        17_582.25,
-        6,
-        0.25,
-        END_TIME_SEC,
-        BAR_STEP_SEC,
-      ),
+      bars: FUT_A_BARS,
+      indicators: emaPair(FUT_A_BARS),
     },
     {
       instrument: {
@@ -148,18 +198,10 @@ export const dashboardDefault: DashboardPayload = {
         rMultiple: 0,
       },
       lastPrice: 4_829.75,
-      lastPriceAt: '2026-04-23T09:45:00Z',
+      lastPriceAt: END_ISO,
       macro: null,
-      bars: generateBars(
-        4242,
-        BAR_COUNT,
-        4_830,
-        4_829.75,
-        2.5,
-        0.5,
-        END_TIME_SEC,
-        BAR_STEP_SEC,
-      ),
+      bars: FUT_B_BARS,
+      indicators: emaPair(FUT_B_BARS),
     },
   ],
 }

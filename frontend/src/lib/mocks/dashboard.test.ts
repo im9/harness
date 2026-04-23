@@ -66,4 +66,20 @@ describe('dashboard mocks', () => {
       expect(last.close).toBe(row.lastPrice)
     }
   })
+
+  it('ships EMA20 and EMA50 indicators aligned to the bar history', () => {
+    // Indicator points travel in the payload so the chart renders the
+    // same values the engine / overlays read (ADR 004 — "indicators
+    // live in the payload"). Length alignment with bars is the minimum
+    // guarantee — otherwise the chart would render a ragged overlay
+    // where the candles and the EMA disagree at the right edge.
+    for (const row of dashboardDefault.rows) {
+      const names = row.indicators.map((i) => i.name)
+      expect(names).toContain('EMA20')
+      expect(names).toContain('EMA50')
+      for (const indicator of row.indicators) {
+        expect(indicator.points.length).toBe(row.bars.length)
+      }
+    }
+  })
 })

@@ -21,19 +21,27 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 // Test files that need to assert on library calls redeclare vi.mock
 // locally with their own spies.
 vi.mock('lightweight-charts', () => {
+  const makePriceLine = () => ({ applyOptions: vi.fn() })
   const makeSeries = () => ({
     setData: vi.fn(),
-    createPriceLine: vi.fn(),
+    createPriceLine: vi.fn(() => makePriceLine()),
+    removePriceLine: vi.fn(),
+  })
+  const makeMarkersPlugin = () => ({
+    setMarkers: vi.fn(),
+    detach: vi.fn(),
   })
   const makeChart = () => ({
     addSeries: vi.fn(() => makeSeries()),
+    removeSeries: vi.fn(),
     timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
     applyOptions: vi.fn(),
     remove: vi.fn(),
   })
   return {
     createChart: vi.fn(() => makeChart()),
-    createSeriesMarkers: vi.fn(),
-    CandlestickSeries: { __tag: 'CandlestickSeries' },
+    createSeriesMarkers: vi.fn(() => makeMarkersPlugin()),
+    CandlestickSeries: { __tag: 'Candlestick' },
+    LineSeries: { __tag: 'Line' },
   }
 })

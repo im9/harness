@@ -24,6 +24,7 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
     lastPriceAt: '2026-04-23T09:45:00Z',
     macro: null,
     bars: [],
+    indicators: [],
   }
   return { ...base, ...overrides }
 }

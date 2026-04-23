@@ -53,20 +53,19 @@ export default function StatusStrip({
             {magnitude}
           </span>
         </div>
-        <div className="h-10 w-32">
-          <AreaChart
-            data={intradayPnl}
-            index="t"
-            categories={['pnl']}
-            colors={[positive ? 'emerald' : 'rose']}
-            showLegend={false}
-            showXAxis={false}
-            showYAxis={false}
-            showGridLines={false}
-            showTooltip={false}
-            autoMinValue
-          />
-        </div>
+        <AreaChart
+          className="h-10 w-32"
+          data={intradayPnl}
+          index="t"
+          categories={['pnl']}
+          colors={[positive ? 'emerald' : 'rose']}
+          showLegend={false}
+          showXAxis={false}
+          showYAxis={false}
+          showGridLines={false}
+          showTooltip={false}
+          autoMinValue
+        />
       </div>
 
       <div className="flex flex-col">

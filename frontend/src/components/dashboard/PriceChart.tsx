@@ -1,15 +1,23 @@
 import {
   CandlestickSeries,
+  LineSeries,
   createChart,
   createSeriesMarkers,
   type IChartApi,
+  type IPriceLine,
+  type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type Time,
   type UTCTimestamp,
 } from 'lightweight-charts'
 import { useEffect, useRef } from 'react'
-import type { InstrumentRowState } from '@/lib/dashboard-types'
+import type { InstrumentRowState, Timeframe } from '@/lib/dashboard-types'
+import TimeframeSelector from './TimeframeSelector'
 
 interface PriceChartProps {
   row: InstrumentRowState
+  timeframe: Timeframe
+  onTimeframeChange: (next: Timeframe) => void
   height?: number
 }
 
@@ -21,15 +29,45 @@ const COLOR_DOWN = '#ef4444'
 const COLOR_GRID = 'rgba(107, 114, 128, 0.12)'
 const COLOR_TEXT = '#9ca3af'
 
-export default function PriceChart({ row, height = 240 }: PriceChartProps) {
+// Indicator palette. Names match the payload's `IndicatorLine.name`;
+// unknown names fall back to a neutral slate so a new indicator can
+// ship from the backend without the chart losing the line entirely.
+const INDICATOR_COLOR: Record<string, string> = {
+  EMA20: '#0ea5e9', // sky
+  EMA50: '#8b5cf6', // violet
+  VWAP: '#f59e0b', // amber
+}
+const INDICATOR_FALLBACK_COLOR = '#94a3b8'
+
+export default function PriceChart({
+  row,
+  timeframe,
+  onTimeframeChange,
+  height = 240,
+}: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<IChartApi | null>(null)
+  const candlesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const indicatorsRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map())
+  const priceLinesRef = useRef<IPriceLine[]>([])
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
+  const fittedRef = useRef(false)
   const hasBars = row.bars.length > 0
 
+  // Create the chart once per mount (re-creation only if `height` or
+  // `hasBars` changes). Streaming payload updates do not rebuild the
+  // chart — they flow through the separate effect below. This split
+  // avoids the 1/sec flicker that a single combined effect would cause
+  // when the SSE stream delivers new snapshots.
   useEffect(() => {
     if (!hasBars || !containerRef.current) return
-
     const container = containerRef.current
-    const chart: IChartApi = createChart(container, {
+    // Snapshot refs at effect-setup so the cleanup closure doesn't
+    // reach through `ref.current` (react-hooks/exhaustive-deps warning
+    // — the ref could have been reassigned between setup and cleanup).
+    const indicators = indicatorsRef.current
+    const priceLines = priceLinesRef.current
+    const chart = createChart(container, {
       width: container.clientWidth,
       height,
       layout: {
@@ -48,59 +86,16 @@ export default function PriceChart({ row, height = 240 }: PriceChartProps) {
       },
       crosshair: { mode: 1 },
     })
-
-    const series = chart.addSeries(CandlestickSeries, {
+    const candles = chart.addSeries(CandlestickSeries, {
       upColor: COLOR_UP,
       downColor: COLOR_DOWN,
       wickUpColor: COLOR_UP,
       wickDownColor: COLOR_DOWN,
       borderVisible: false,
     })
-
-    series.setData(
-      row.bars.map((b) => ({
-        time: b.time as UTCTimestamp,
-        open: b.open,
-        high: b.high,
-        low: b.low,
-        close: b.close,
-      })),
-    )
-
-    if (row.setup) {
-      series.createPriceLine({
-        price: row.setup.target.price,
-        color: COLOR_UP,
-        lineWidth: 1,
-        lineStyle: 2,
-        axisLabelVisible: true,
-        title: `target · ${row.setup.target.label}`,
-      })
-      series.createPriceLine({
-        price: row.setup.retreat.price,
-        color: COLOR_DOWN,
-        lineWidth: 1,
-        lineStyle: 2,
-        axisLabelVisible: true,
-        title: `retreat · ${row.setup.retreat.label}`,
-      })
-    }
-
-    if (row.state === 'ENTER' && row.setup) {
-      const lastBar = row.bars[row.bars.length - 1]
-      const long = row.setup.side === 'long'
-      createSeriesMarkers(series, [
-        {
-          time: lastBar.time as UTCTimestamp,
-          position: long ? 'belowBar' : 'aboveBar',
-          color: long ? COLOR_UP : COLOR_DOWN,
-          shape: long ? 'arrowUp' : 'arrowDown',
-          text: row.setup.setupName,
-        },
-      ])
-    }
-
-    chart.timeScale().fitContent()
+    chartRef.current = chart
+    candlesRef.current = candles
+    fittedRef.current = false
 
     const observer = new ResizeObserver(() => {
       chart.applyOptions({ width: container.clientWidth })
@@ -110,29 +105,151 @@ export default function PriceChart({ row, height = 240 }: PriceChartProps) {
     return () => {
       observer.disconnect()
       chart.remove()
+      chartRef.current = null
+      candlesRef.current = null
+      indicators.clear()
+      priceLines.length = 0
+      markersRef.current = null
     }
-  }, [row, height, hasBars])
+  }, [height, hasBars])
+
+  // Apply the payload to the live chart. Runs on mount (right after
+  // the chart is created) and on every row change delivered by the
+  // SSE stream. Each piece — bars, indicators, price lines, markers —
+  // is upserted in place rather than re-built, so the chart keeps its
+  // user-visible state (scroll position, crosshair) across updates.
+  useEffect(() => {
+    const chart = chartRef.current
+    const candles = candlesRef.current
+    if (!chart || !candles) return
+
+    candles.setData(
+      row.bars.map((b) => ({
+        time: b.time as UTCTimestamp,
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+      })),
+    )
+
+    // Indicators: upsert by name so an existing EMA20 series updates
+    // in place instead of being torn down and re-added every tick.
+    const seen = new Set<string>()
+    for (const indicator of row.indicators) {
+      seen.add(indicator.name)
+      let series = indicatorsRef.current.get(indicator.name)
+      if (!series) {
+        series = chart.addSeries(LineSeries, {
+          color: INDICATOR_COLOR[indicator.name] ?? INDICATOR_FALLBACK_COLOR,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          title: indicator.name,
+        })
+        indicatorsRef.current.set(indicator.name, series)
+      }
+      series.setData(
+        indicator.points.map((p) => ({
+          time: p.time as UTCTimestamp,
+          value: p.value,
+        })),
+      )
+    }
+    for (const [name, series] of indicatorsRef.current) {
+      if (!seen.has(name)) {
+        chart.removeSeries(series)
+        indicatorsRef.current.delete(name)
+      }
+    }
+
+    // Price lines: cheap to recreate; there are at most two per row,
+    // and the library has no upsert API for them.
+    for (const priceLine of priceLinesRef.current) {
+      candles.removePriceLine(priceLine)
+    }
+    priceLinesRef.current = []
+    if (row.setup) {
+      priceLinesRef.current.push(
+        candles.createPriceLine({
+          price: row.setup.target.price,
+          color: COLOR_UP,
+          lineWidth: 1,
+          lineStyle: 2,
+          axisLabelVisible: true,
+          title: `target · ${row.setup.target.label}`,
+        }),
+      )
+      priceLinesRef.current.push(
+        candles.createPriceLine({
+          price: row.setup.retreat.price,
+          color: COLOR_DOWN,
+          lineWidth: 1,
+          lineStyle: 2,
+          axisLabelVisible: true,
+          title: `retreat · ${row.setup.retreat.label}`,
+        }),
+      )
+    }
+
+    // Trigger marker on the latest bar when state is ENTER. Reuse the
+    // marker plugin across updates so repeated ENTER snapshots don't
+    // stack plugins on the same series.
+    if (row.state === 'ENTER' && row.setup) {
+      const lastBar = row.bars[row.bars.length - 1]
+      const long = row.setup.side === 'long'
+      const marker = {
+        time: lastBar.time as UTCTimestamp,
+        position: (long ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
+        color: long ? COLOR_UP : COLOR_DOWN,
+        shape: (long ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+        text: row.setup.setupName,
+      }
+      if (markersRef.current) {
+        markersRef.current.setMarkers([marker])
+      } else {
+        markersRef.current = createSeriesMarkers(candles, [marker])
+      }
+    } else {
+      markersRef.current?.setMarkers([])
+    }
+
+    if (!fittedRef.current) {
+      chart.timeScale().fitContent()
+      fittedRef.current = true
+    }
+  }, [row])
 
   if (!hasBars) {
     return (
-      <div
-        role="status"
-        aria-label={`${row.instrument.displayName} price chart`}
-        className="border-border bg-muted/10 text-muted-foreground flex items-center justify-center rounded-md border border-dashed text-xs"
-        style={{ height }}
-      >
-        No price data
+      <div className="flex flex-col gap-2">
+        <div className="flex justify-end">
+          <TimeframeSelector value={timeframe} onChange={onTimeframeChange} />
+        </div>
+        <div
+          role="status"
+          aria-label={`${row.instrument.displayName} price chart`}
+          className="border-border bg-muted/10 text-muted-foreground flex items-center justify-center rounded-md border border-dashed text-xs"
+          style={{ height }}
+        >
+          No price data
+        </div>
       </div>
     )
   }
 
   return (
-    <div
-      ref={containerRef}
-      aria-label={`${row.instrument.displayName} price chart`}
-      role="img"
-      className="border-border bg-card/40 overflow-hidden rounded-md border"
-      style={{ height }}
-    />
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-end">
+        <TimeframeSelector value={timeframe} onChange={onTimeframeChange} />
+      </div>
+      <div
+        ref={containerRef}
+        aria-label={`${row.instrument.displayName} price chart`}
+        role="img"
+        className="border-border bg-card/40 overflow-hidden rounded-md border"
+        style={{ height }}
+      />
+    </div>
   )
 }

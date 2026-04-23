@@ -14,6 +14,33 @@ export type SessionPhase = 'pre_open' | 'open' | 'lunch' | 'close' | 'after_hour
 
 export type ImpactTier = 'low' | 'medium' | 'high'
 
+// Chart timeframes. Wire-friendly string literals so the frontend and
+// the eventual backend (ADR 004 provider adapters) agree on the same
+// vocabulary without a translation table. `10s` is retained as the
+// mock's demo-live cadence; longer timeframes are what operators
+// typically configure for live trading.
+export type Timeframe = '10s' | '1m' | '5m' | '15m' | '1h' | '1d' | '1w'
+
+export const TIMEFRAMES: readonly Timeframe[] = [
+  '10s',
+  '1m',
+  '5m',
+  '15m',
+  '1h',
+  '1d',
+  '1w',
+] as const
+
+export const TIMEFRAME_SEC: Record<Timeframe, number> = {
+  '10s': 10,
+  '1m': 60,
+  '5m': 300,
+  '15m': 900,
+  '1h': 3600,
+  '1d': 86_400,
+  '1w': 604_800,
+}
+
 export interface Instrument {
   symbol: string
   displayName: string
@@ -62,6 +89,23 @@ export interface Bar {
   close: number
 }
 
+// Indicator values travel in the payload rather than being recomputed
+// on the client so the chart agrees with whatever the backend setup
+// engine / rule overlay is reading (e.g. a "VWAP reclaim" setup must
+// use the same VWAP the chart renders).
+export type IndicatorKind = 'ema' | 'sma' | 'vwap' | 'line'
+
+export interface IndicatorPoint {
+  time: number
+  value: number
+}
+
+export interface IndicatorLine {
+  name: string
+  kind: IndicatorKind
+  points: IndicatorPoint[]
+}
+
 export interface InstrumentRowState {
   instrument: Instrument
   state: RecommendationState
@@ -70,6 +114,7 @@ export interface InstrumentRowState {
   lastPriceAt: string
   macro: MacroEventWindow | null
   bars: Bar[]
+  indicators: IndicatorLine[]
 }
 
 export interface PnlPoint {
