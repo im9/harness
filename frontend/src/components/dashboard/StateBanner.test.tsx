@@ -19,6 +19,7 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
       target: { price: 17620.5, label: '+2R' },
       retreat: { price: 17548.75, label: 'stop' },
       rMultiple: 0,
+      setupRange: null,
     },
     lastPrice: 17582.25,
     lastPriceAt: '2026-04-23T09:45:00Z',

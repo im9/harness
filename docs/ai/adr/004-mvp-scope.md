@@ -213,9 +213,14 @@ mock-first against the payload contract; backend follows.
         `StatusStrip` (Tremor `AreaChart`). Chart slot is a
         placeholder pending (b).
   - [ ] (b) `lightweight-charts` price and volume panes with
-        annotations (VWAP dashed line, setup range shading, target /
-        retreat price lines, trigger markers, macro vertical band).
-        Per-row timeframe switcher.
+        annotations:
+    - [x] Per-row timeframe switcher
+    - [x] Target / retreat price lines
+    - [x] Trigger markers on originating bars
+    - [x] VWAP dashed line
+    - [x] Macro event vertical band
+    - [x] Setup range shading
+    - [ ] Volume pane
   - [ ] Wire to the real `GET /api/dashboard` /
         `WebSocket /ws/dashboard` payload.
 - [ ] Frontend: AI chat drawer (SSE consumer, cross-link to chart
@@ -271,3 +276,12 @@ buy") as cheap insurance on top of the private-access model.
   modes. Each phase is a successor ADR.
 - **Setup-performance feedback loop** — surface the worst-performing
   setup of the prior period and prompt for retune / retire.
+- **Dynamic indicator bands** — Bollinger, Keltner, VWAP ±σ, ATR
+  channel. Upper and lower series that evolve per bar with an
+  optional fill between them. Distinct from Phase 1's static
+  `setupRange` (a fixed horizontal band on a setup's context) and
+  sits in the indicator pipeline, not the setup schema. Warrants its
+  own ADR covering payload shape (likely paired `IndicatorLine`
+  entries with a fill directive), per-indicator configuration, and
+  chart rendering (two `LineSeries` + a custom primitive or
+  area-series fill).

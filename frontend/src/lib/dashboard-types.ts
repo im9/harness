@@ -54,12 +54,25 @@ export interface PriceLevel {
   label: string
 }
 
+// Bounded horizontal region meaningful to a setup — opening range,
+// consolidation, value area, prior-day high/low. `midline` is
+// optional because not every range has a natural mid anchor (ORs do;
+// some consolidations don't). Dynamic bands (Bollinger, VWAP±σ,
+// Keltner, ATR channel) live in the indicator pipeline, not here —
+// see ADR 004 Future extensions.
+export interface SetupRange {
+  upper: PriceLevel
+  lower: PriceLevel
+  midline?: PriceLevel
+}
+
 export interface SetupContext {
   setupName: string
   side: Side
   target: PriceLevel
   retreat: PriceLevel
   rMultiple: number
+  setupRange: SetupRange | null
 }
 
 export interface MacroEventWindow {

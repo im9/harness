@@ -32,6 +32,7 @@ vi.mock('lightweight-charts', () => ({
           return { applyOptions: vi.fn() }
         },
         removePriceLine: vi.fn(),
+        priceToCoordinate: vi.fn(() => null),
       }
     },
     removeSeries: vi.fn(),
@@ -70,6 +71,7 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
       target: { price: 17620.5, label: '+2R' },
       retreat: { price: 17548.75, label: 'stop' },
       rMultiple: 0,
+      setupRange: null,
     },
     lastPrice: 17582.25,
     lastPriceAt: '2026-04-23T09:45:00Z',
@@ -195,6 +197,54 @@ describe('PriceChart', () => {
     }
     expect(options.get('VWAP')?.lineStyle).toBe(2)
     expect(options.get('EMA20')?.lineStyle ?? 0).toBe(0)
+  })
+
+  it('renders a setup range band when the setup defines upper and lower bounds', () => {
+    const fixture = row({
+      setup: {
+        setupName: 'Opening range break',
+        side: 'long',
+        target: { price: 17_620.5, label: '+2R' },
+        retreat: { price: 17_548.75, label: 'stop' },
+        rMultiple: 0,
+        setupRange: {
+          upper: { price: 17_595, label: 'ORH' },
+          lower: { price: 17_560, label: 'ORL' },
+        },
+      },
+    })
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={fixture} />)
+    // Shaded band visualizes the setup's bounded region (ADR 004
+    // dashboard spec). Accessibility-visible label carries the setup
+    // name so the region's context is announced.
+    expect(
+      screen.getByLabelText(/setup range · opening range break/i),
+    ).toBeInTheDocument()
+  })
+
+  it('renders a setup range midline when one is provided', () => {
+    const fixture = row({
+      setup: {
+        setupName: 'Opening range break',
+        side: 'long',
+        target: { price: 17_620.5, label: '+2R' },
+        retreat: { price: 17_548.75, label: 'stop' },
+        rMultiple: 0,
+        setupRange: {
+          upper: { price: 17_595, label: 'ORH' },
+          lower: { price: 17_560, label: 'ORL' },
+          midline: { price: 17_577.5, label: 'OR mid' },
+        },
+      },
+    })
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={fixture} />)
+    expect(screen.getByLabelText(/setup range midline/i)).toBeInTheDocument()
+  })
+
+  it('omits the setup range band when the setup has no range', () => {
+    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row()} />)
+    expect(screen.queryByLabelText(/setup range ·/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/setup range midline/i)).not.toBeInTheDocument()
   })
 
   it('renders a macro event band when the row is in an event window', () => {

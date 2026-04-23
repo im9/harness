@@ -14,6 +14,7 @@ import { useEffect, useRef } from 'react'
 import type {
   IndicatorKind,
   InstrumentRowState,
+  SetupRange,
   Timeframe,
 } from '@/lib/dashboard-types'
 import TimeframeSelector from './TimeframeSelector'
@@ -51,6 +52,52 @@ const LINE_STYLE_SOLID = 0
 const LINE_STYLE_DASHED = 2
 function indicatorLineStyle(kind: IndicatorKind): number {
   return kind === 'vwap' ? LINE_STYLE_DASHED : LINE_STYLE_SOLID
+}
+
+// Positions the setup-range band overlay between two price levels on
+// the chart's vertical axis, and (optionally) its midline child at a
+// third level. Null `range` or null pixel coordinates collapse the
+// band to zero height; the midline is hidden via display:none so its
+// 1px top border doesn't linger at the container's top edge.
+function positionSetupRangeBand(
+  candles: ISeriesApi<'Candlestick'>,
+  band: HTMLDivElement | null,
+  midline: HTMLDivElement | null,
+  range: SetupRange | null,
+): void {
+  if (!band) return
+  const collapse = () => {
+    band.style.top = '0px'
+    band.style.height = '0px'
+    if (midline) midline.style.display = 'none'
+  }
+  if (!range) {
+    collapse()
+    return
+  }
+  const yUpper = candles.priceToCoordinate(range.upper.price)
+  const yLower = candles.priceToCoordinate(range.lower.price)
+  if (yUpper == null || yLower == null) {
+    collapse()
+    return
+  }
+  const top = Math.min(yUpper, yLower)
+  const height = Math.max(1, Math.abs(yLower - yUpper))
+  band.style.top = `${top}px`
+  band.style.height = `${height}px`
+  if (midline) {
+    if (range.midline) {
+      const yMid = candles.priceToCoordinate(range.midline.price)
+      if (yMid == null) {
+        midline.style.display = 'none'
+      } else {
+        midline.style.top = `${yMid}px`
+        midline.style.display = 'block'
+      }
+    } else {
+      midline.style.display = 'none'
+    }
+  }
 }
 
 // Positions the macro-event overlay div between two timestamps on the
@@ -101,6 +148,12 @@ export default function PriceChart({
   // so the visible-range subscriber (which fires on pan / zoom without
   // a fresh snapshot) repositions against the current macro event.
   const macroWindowRef = useRef<{ start: number; end: number } | null>(null)
+  const setupRangeBandRef = useRef<HTMLDivElement>(null)
+  const setupRangeMidlineRef = useRef<HTMLDivElement>(null)
+  // Setup range held in a ref for the same reason as macroWindowRef:
+  // the time-range subscription closure needs the latest payload
+  // without re-binding on every render.
+  const setupRangeRef = useRef<SetupRange | null>(null)
   // Tracks the timestamp of `bars[0]` from the last render we fit. It
   // changes whenever the series is replaced with one covering a
   // different time range (i.e. timeframe switch), but stays constant
@@ -156,13 +209,27 @@ export default function PriceChart({
     const observer = new ResizeObserver(() => {
       chart.applyOptions({ width: container.clientWidth })
       positionMacroBand(chart, macroBandRef.current, macroWindowRef.current)
+      positionSetupRangeBand(
+        candles,
+        setupRangeBandRef.current,
+        setupRangeMidlineRef.current,
+        setupRangeRef.current,
+      )
     })
     observer.observe(container)
 
-    // Follow pan / zoom so the macro band doesn't drift off its window
-    // between SSE snapshots.
+    // Follow pan / zoom so the overlays don't drift off their anchors
+    // between SSE snapshots. Time-range changes also tend to co-occur
+    // with auto-rescales of the price axis, which is when the setup
+    // range needs repositioning too.
     const onVisibleRangeChange = () => {
       positionMacroBand(chart, macroBandRef.current, macroWindowRef.current)
+      positionSetupRangeBand(
+        candles,
+        setupRangeBandRef.current,
+        setupRangeMidlineRef.current,
+        setupRangeRef.current,
+      )
     }
     chart.timeScale().subscribeVisibleTimeRangeChange(onVisibleRangeChange)
 
@@ -293,6 +360,14 @@ export default function PriceChart({
         }
       : null
     positionMacroBand(chart, macroBandRef.current, macroWindowRef.current)
+
+    setupRangeRef.current = row.setup?.setupRange ?? null
+    positionSetupRangeBand(
+      candles,
+      setupRangeBandRef.current,
+      setupRangeMidlineRef.current,
+      setupRangeRef.current,
+    )
   }, [row])
 
   if (!hasBars) {
@@ -325,6 +400,24 @@ export default function PriceChart({
           role="img"
           style={{ height }}
         />
+        {row.setup?.setupRange && row.setup && (
+          <>
+            <div
+              ref={setupRangeBandRef}
+              aria-label={`setup range · ${row.setup.setupName}`}
+              className="pointer-events-none absolute inset-x-0 border-y border-indigo-400/40 bg-indigo-400/10"
+              style={{ top: 0, height: 0 }}
+            />
+            {row.setup.setupRange.midline && (
+              <div
+                ref={setupRangeMidlineRef}
+                aria-label={`setup range midline · ${row.setup.setupRange.midline.label}`}
+                className="pointer-events-none absolute inset-x-0 border-t border-dashed border-indigo-400/70"
+                style={{ top: 0, height: 0 }}
+              />
+            )}
+          </>
+        )}
         {row.macro && (
           <div
             ref={macroBandRef}

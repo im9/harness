@@ -26,6 +26,10 @@ vi.mock('lightweight-charts', () => {
     setData: vi.fn(),
     createPriceLine: vi.fn(() => makePriceLine()),
     removePriceLine: vi.fn(),
+    // Null in jsdom — the setup-range overlay tolerates null pixel
+    // coordinates by collapsing its height, just like the macro band
+    // does for null time coordinates.
+    priceToCoordinate: vi.fn(() => null),
   })
   const makeMarkersPlugin = () => ({
     setMarkers: vi.fn(),
