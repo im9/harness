@@ -118,18 +118,35 @@ R distribution, rule effectiveness) justify the schema work.
   nothing) rather than a guess.
 - Optional CLI YAML import / export for bootstrap and backup
   (gitignored).
+- **Privacy boundary for fixtures and documentation.** Public market
+  identifiers (Nikkei 225, TOPIX, USD/JPY, S&P 500, WTI crude, etc.)
+  are permitted in mocks, tests, fixtures, and ADR examples —
+  without them the UI and its tests cannot communicate what a real
+  session looks like. What must not appear in tracked code is the
+  *operator-specific* layer: which subset they actually track,
+  their threshold values, session specifics, setup choices, and
+  vendor selection. Those live only in the DB and `.env`.
 
 ### Settings UI
 
 One panel per concern, persisted on save, validated via shared
 Pydantic schemas:
 
-Instruments (primary + watchlist) · Sessions · Rule overlay · Setup
-library · Macro overlay · Market-data provider · Event-calendar
-provider · News provider · AI chat provider · Notifications.
+Sessions · Rule overlay · Setup library · Macro overlay · Market-data
+provider · Event-calendar provider · News provider · AI chat
+provider · Notifications.
 
 Provider panels expose a "test connection" button. A failing test does
 not block save — the panel is marked "unverified".
+
+**Instrument management** — adding / removing / editing the set of
+tracked instruments and wiring them to setup-library entries — is
+deliberately out of scope for ADR 004 and lives in a **separate
+ADR**. That ADR will cover the full add / edit / remove UX, including
+which instrument boots as primary on page load. ADR 004 assumes the
+set of tracked instruments already exists in the DB; the dashboard
+chooses the first entry as the initial primary and otherwise relies
+on the swap mechanics described below.
 
 ### AI chat (floating, user-initiated)
 
@@ -140,10 +157,11 @@ not block save — the panel is marked "unverified".
   back).
 - Session-only; no persistence.
 - Auto-injected per turn (prompt-cached): current price / VWAP /
-  setup state for the primary instrument, current recommendation and
-  reason, watchlist snapshot (symbols + state badges + last prices),
-  today's P&L and distance to cap, upcoming macro events, recent news
-  headlines.
+  setup state for the active primary, current recommendation and
+  reason, watchlist snapshot (ticker + state + last price + pctChange
+  per tracked instrument, active primary excluded to avoid
+  duplication), today's P&L and distance to cap, upcoming macro
+  events, recent news headlines.
 - Text in, text out. No tool use in Phase 1.
 - **UI**: a floating action button anchored to the dashboard's
   bottom-right corner. Click expands into a right-aligned slide-in
@@ -155,14 +173,32 @@ not block save — the panel is marked "unverified".
 
 ### Dashboard layout
 
-Phase 1 centers on a **single primary instrument**
-(operator-configured via `/settings`, Nikkei futures as the bootstrap
-target). The route's real estate splits ~70 / 30 between a
-primary-instrument panel on the left and a right-side context column.
-Multi-primary layouts are deliberately out of scope for Phase 1 —
-different asset classes (stocks, FX) are expected to grow their own
-page shapes and will live in successor ADRs rather than being
-retrofitted here.
+The dashboard renders the operator's **active primary instrument** as
+the hero chart, with every *other* tracked instrument listed as a
+mini-row in the Watchlist widget. The route's real estate splits
+~70 / 30 between the primary panel on the left and a right-side
+context column.
+
+**Primary is a view mode, not a fixed property.** The engine tracks
+state for *every* operator-configured instrument; "primary" is simply
+the one the dashboard is currently focused on. Click any watchlist
+row to promote it to primary — the displaced primary slides back
+into the watchlist in its place. This is the only row action in
+Phase 1: no detail drawer, no context menu, no keyboard shortcut
+(the last is a Future extension). The active primary is excluded
+from the watchlist list so the two surfaces never duplicate the same
+instrument; the state banner is the single source of "this is what
+you are looking at".
+
+**No single-asset-class constraint.** The primary can be any tracked
+instrument regardless of asset class (index future, FX cross, US
+index future, single stock, …), and the watchlist freely mixes asset
+classes. Context indicators (e.g. USD/JPY for a Japan-index primary)
+live in the same list as same-asset alternates — whatever the
+operator configures.
+
+Simultaneous multi-primary (two or more full charts side-by-side) is
+a genuinely different layout concern and stays in Future extensions.
 
 Top status strip (full width): today's P&L (Tremor `AreaChart`
 sparkline + the current number), session phase, next macro event +
@@ -172,14 +208,16 @@ countdown.
 ┌────────────────────────────────────────────┬─────────────────┐
 │ StatusStrip: P&L sparkline, phase, next macro event          │
 ├────────────────────────────────────────────┼─────────────────┤
-│ State banner (setup name, side, R target)  │  Watchlist      │
-├────────────────────────────────────────────┤  widget         │
-│                                            │  - mini row     │
-│  Price chart (candles)                     │    per secondary│
-│   - VWAP dashed line                       │    instrument:  │
-│   - Setup range / levels shaded            │    state badge, │
-│   - Target / retreat price lines           │    last price,  │
-│   - Setup trigger markers                  │    sparkline    │
+│ Nikkei 225 Mini            ● ENTER         │  Watchlist      │
+│ NKM · OSE                                  │  - click-to-    │
+│ Opening range break · LONG · tgt 38,650    │    swap rows:   │
+├────────────────────────────────────────────┤   [tkr] [name]  │
+│                                            │   [●state]      │
+│  Price chart (candles)                     │   [%chg]        │
+│   - VWAP dashed line                       │   [sparkline]   │
+│   - Setup range / levels shaded            │   [last price]  │
+│   - Target / retreat price lines           │                 │
+│   - Setup trigger markers                  │                 │
 │   - Macro event vertical band              │                 │
 ├────────────────────────────────────────────┼─────────────────┤
 │  Volume pane                               │  News widget    │
@@ -191,15 +229,37 @@ countdown.
                                                        [AI] FAB
 ```
 
+**State banner hierarchy.** The banner's job is to make "which
+instrument is on screen and in what state" readable at a glance,
+because the watchlist no longer shows the active primary. Three
+tiers, explicit in typography:
+
+1. **Hero line** — instrument display name (largest text on the
+   page) with the state badge right-aligned (colored chip +
+   ENTER / HOLD / EXIT / RETREAT label).
+2. **Sub-line** — ticker · venue, smaller and muted.
+3. **Meta strip** — setup name · side · target · retreat, smaller
+   still and visually de-emphasized.
+
+This ordering puts "what am I looking at" first and "what are the
+setup parameters" third. A swap lands unambiguously because the hero
+line is the largest element on the dashboard — the operator cannot
+miss which instrument is focused.
+
 Component boundaries (Phase 1 frontend):
 
 - `PrimaryInstrumentPanel` — state banner + price chart (with all
   annotations) + volume pane + rule gauge bundled as a single
   decision unit. One per page.
-- `Watchlist` widget — N secondary instruments as a vertical list of
-  mini rows (state badge + last price + sparkline). Context, not
-  decision units: no full chart, no per-row timeframe switcher.
-  Operator-configured from the DB.
+- `Watchlist` widget — the *other* tracked instruments (all except
+  the active primary) as a vertical list of mini rows. Each row
+  shows: ticker · display name · state dot · pctChange from session
+  anchor · sparkline · last price. Clicking a row swaps it with the
+  current primary; this is the sole row action in Phase 1. The row
+  payload (`WatchlistItem`) intentionally omits the heavy per-
+  instrument data (bars / indicators / setup / macro) — those live
+  on the primary payload only and are recomputed by the backend
+  when a swap promotes a new instrument to primary.
 - `NewsFeed` widget — streamed headline list (impact tag + time +
   title). Read-only in Phase 1 — filter, source badges, sentiment,
   click-through detail are Future extensions.
@@ -233,8 +293,13 @@ glance from a locked phone reads the same story.
 - Automated order placement (permanent, ADR 001)
 - Backtest UI (logic is backtestable offline; no UI module in Phase 1)
 - Multi-asset-class portfolio view
-- Multi-primary dashboard (two+ full charts side-by-side) — defer to a
-  successor ADR when a second asset class warrants its own page
+- **Simultaneous** multi-primary (two or more full charts visible
+  side-by-side). Phase 1 ships single-active-with-swap; a genuine
+  multi-chart grid is a different UX concern and lives in Future
+  extensions.
+- Instrument management UI (add / edit / remove tracked instruments,
+  assign setup library entries per instrument) — covered by a
+  separate ADR
 - History / review / archive screens (no persistence → no surface)
 
 ## Implementation
@@ -277,25 +342,51 @@ mock-first against the payload contract; backend follows.
     - [x] Macro event vertical band
     - [x] Setup range shading
     - [x] Volume pane
-  - [x] (c) Layout reshape: `PrimaryInstrumentPanel` (left) +
-        right-side widget column. Payload contract replaces
-        `rows: InstrumentRowState[]` with `primary: InstrumentRowState`,
-        `watchlist: WatchlistItem[]` (lighter shape — state badge,
-        last price, sparkline points), and `news: NewsItem[]`.
-        `Watchlist` / `NewsFeed` ship as layout-only stubs; content
-        lands in (d) / (e).
-  - [ ] (d) `Watchlist` widget — mini row per secondary instrument
-        (state badge + last price + sparkline). No full chart; reuses
-        a lightweight sparkline primitive rather than instantiating a
-        second `lightweight-charts` chart per row.
-  - [ ] (e) `NewsFeed` widget — streamed headline list (impact tag +
-        time + title). Read-only.
-  - [ ] (f) `AiChatFloat` — FAB bottom-right → right-aligned slide-in
-        panel. SSE consumer; cross-link to chart markers when the AI
-        references a chart element by time ("the sweep at 14:23"
-        pulses the corresponding marker).
+  - [x] (c) Layout reshape (schema v1): `PrimaryInstrumentPanel`
+        (left) + right-side widget column. Payload splits into
+        `primary: InstrumentRowState`, `watchlist: WatchlistItem[]`,
+        `news: NewsItem[]`. `Watchlist` / `NewsFeed` shipped as
+        layout-only stubs against this v1 shape. (Superseded below
+        by schema v2 once the swap model supersedes the original
+        single-primary framing.)
+  - [ ] (d) Schema v2 + realistic mocks. `WatchlistItem` drops the
+        heavy per-instrument fields (bars / indicators / setup /
+        macro) and gains `pctChange: number` plus a lighter
+        `sparkline: SparklinePoint[]`; `state` is retained so every
+        tracked instrument carries a recommendation state. The
+        `watchlist` array excludes the active primary (layout
+        contract: the two surfaces never duplicate). Mock backend
+        accepts a `primarySymbol` on snapshot requests and re-shapes
+        the payload accordingly. Mock data: Nikkei 225 Mini as
+        primary, TOPIX Mini / USD-JPY / S&P 500 E-mini as watchlist
+        — realistic enough to read as a real operator session.
+  - [ ] (e) Swap mechanics. `Dashboard` owns a `primarySymbol`
+        state, initialized from the first tracked instrument.
+        Subscription re-opens when the symbol changes. The per-
+        instrument `timeframes` map is preserved across swaps so
+        each instrument remembers its last-chosen cadence.
+        `PriceChart` fits content on symbol change (pan / zoom are
+        reset since the price range is unrelated). Banner mount
+        animation runs naturally on swap — no special suppression.
+  - [ ] (f) State banner redesign (three-tier hero / sub / meta as
+        described in "State banner hierarchy"). Hero instrument
+        name is the largest text on the page; setup parameters
+        relegate to a de-emphasized meta strip.
+  - [ ] (g) `Watchlist` widget — mini row per non-primary tracked
+        instrument. Row shows ticker · display name · state dot ·
+        pctChange · sparkline · last price. Row is a button — click
+        invokes the swap handler. Sparkline is a self-rolled SVG
+        primitive (polyline + optional last-point dot), **not** a
+        second `lightweight-charts` instance per row.
+  - [ ] (h) `NewsFeed` widget — streamed headline list (impact tag
+        + time + title). Read-only.
+  - [ ] (i) `AiChatFloat` — FAB bottom-right → right-aligned
+        slide-in panel. SSE consumer; cross-link to chart markers
+        when the AI references a chart element by time ("the sweep
+        at 14:23" pulses the corresponding marker).
   - [ ] Wire to the real `GET /api/dashboard` /
-        `WebSocket /ws/dashboard` payload.
+        `WebSocket /ws/dashboard` payload (with `primarySymbol`
+        query / message parameter for swap).
 - [ ] CLI: `harness config import / export <yaml>`
 - [ ] E2E on mocks: scenario-driven session exercises the full
       pipeline (tick → engine → recommendation → UI → chat context)
@@ -308,6 +399,16 @@ tick log + rule state. No wall-clock reads in engine logic, no random
 tiebreaks, no mutable shared state. Since Phase 1 does not persist the
 tick log, this is an invariant on the engine's *shape*, not a
 historical audit trail.
+
+**Swap is a view-level action.** The engine emits state, bars, and
+indicators for every tracked instrument on every tick, regardless of
+which one the dashboard currently focuses on. The swap simply
+re-parameterizes the subscription's `primarySymbol`; the backend
+re-projects the same underlying data into the heavy `primary` shape
+for the new focus and the lighter `WatchlistItem` shape for the
+rest. No tick / state / indicator history is recomputed, and no
+engine decision is re-played — swap never changes what the engine
+concluded, only what the dashboard is currently showing.
 
 **AI guardrail is structural.** Rule state is computed upstream of the
 chat request; the AI's output channel is text back to the operator
@@ -356,11 +457,15 @@ buy") as cheap insurance on top of the private-access model.
   entries with a fill directive), per-indicator configuration, and
   chart rendering (two `LineSeries` + a custom primitive or
   area-series fill).
-- **Multi-primary dashboard** — two instruments side-by-side, or a
-  grid of primaries. Likely tied to asset-class-specific pages
-  (stock dashboard ≠ futures dashboard); a successor ADR per asset
-  class is more natural than retrofitting the Phase 1 single-primary
-  shell.
+- **Simultaneous multi-primary dashboard** — two or more instruments
+  rendered as full decision units side-by-side (distinct from Phase
+  1's swap, which keeps a single active). Raises its own concerns:
+  per-chart rule attribution, cross-chart event correlation,
+  responsive collapse rules. Warrants its own ADR.
+- **Keyboard shortcuts for primary swap** — `1-9` or a command
+  palette to jump between tracked instruments without reaching for
+  the mouse. Deliberately out of Phase 1 (pointer only) but trivial
+  to layer on top once the swap handler is stable.
 - **News feed expansion** — filter bar, source badges, sentiment
   tag, click-through detail panel. A natural continuation of the
   Phase 1 read-only list once operator feedback shapes which
@@ -369,3 +474,13 @@ buy") as cheap insurance on top of the private-access model.
   widgets (e.g. correlation matrix, open interest, put-call ratio).
   Phase 1 fixes the order at Watchlist → NewsFeed; a later iteration
   might expose the layout in `/settings`.
+
+## Related ADRs
+
+- **[future] Instrument management ADR** — adding, editing, and
+  removing tracked instruments; assigning setup-library entries per
+  instrument; choosing which instrument boots as the default
+  primary. ADR 004 consumes the result (a ready set of tracked
+  instruments in the DB) but does not cover the management UX.
+  Until that ADR lands, operators seed the instrument list via the
+  CLI YAML import or direct DB edits.
