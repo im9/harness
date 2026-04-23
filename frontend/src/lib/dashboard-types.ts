@@ -131,6 +131,37 @@ export interface InstrumentRowState {
   indicators: IndicatorLine[]
 }
 
+// Minimal context-only shape for secondary instruments in the right-
+// column Watchlist widget. Intentionally lighter than
+// `InstrumentRowState`: no bars, no indicators, no setup — just enough
+// to render a state badge, a last price, and a sparkline. The widget
+// is a context surface, not a decision unit (ADR 004 Dashboard
+// layout), so the heavier chart pipeline would be wasted on it.
+export interface SparklinePoint {
+  // UTC seconds since epoch — same time base as `Bar.time` so the
+  // sparkline can interleave with primary-panel data if needed.
+  time: number
+  value: number
+}
+
+export interface WatchlistItem {
+  instrument: Instrument
+  state: RecommendationState
+  lastPrice: number
+  lastPriceAt: string
+  sparkline: SparklinePoint[]
+}
+
+// Streamed headline shown in the right-column NewsFeed. Read-only in
+// Phase 1 — filter, source badge, sentiment, click-through detail are
+// Future extensions (ADR 004 Future extensions).
+export interface NewsItem {
+  id: string
+  title: string
+  impactTier: ImpactTier
+  at: string
+}
+
 export interface PnlPoint {
   t: string
   pnl: number
@@ -147,5 +178,10 @@ export interface DashboardPayload {
   nextMacroEvent: NextMacroEvent | null
   intradayPnl: PnlPoint[]
   rule: RuleOverlayState
-  rows: InstrumentRowState[]
+  // Phase 1 centers on a single primary instrument (ADR 004). Multi-
+  // primary layouts grow into successor ADRs per asset class rather
+  // than being retrofitted here.
+  primary: InstrumentRowState
+  watchlist: WatchlistItem[]
+  news: NewsItem[]
 }

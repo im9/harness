@@ -24,8 +24,13 @@ interface PriceChartProps {
   row: InstrumentRowState
   timeframe: Timeframe
   onTimeframeChange: (next: Timeframe) => void
-  height?: number
 }
+
+// Fallback pixel height used only when the chart's container has no
+// measurable height yet (first paint, or an ancestor that has not
+// established a height claim). The container-driven path below
+// overwrites this as soon as the ResizeObserver fires.
+const FALLBACK_CHART_HEIGHT = 320
 
 // Palette chosen to match the dashboard state banner: emerald for the
 // long / target direction, rose for short / retreat. Grid is kept at
@@ -57,10 +62,11 @@ const LINE_STYLE_DASHED = 2
 // pane for attention. Alpha is ~60% of the candle's.
 const VOLUME_UP_COLOR = 'rgba(16, 185, 129, 0.55)' // emerald-500 @ 55%
 const VOLUME_DOWN_COLOR = 'rgba(239, 68, 68, 0.55)' // red-500 @ 55%
-// Keep the volume pane compact — price stays dominant. 56px at the
-// default 240px container leaves ~180px for candles, preserving the
-// 2-rows-per-viewport budget discussed with the ADR 004 layout.
-const VOLUME_PANE_HEIGHT = 56
+// Volume pane stays a fixed strip at the bottom so the price pane
+// absorbs any additional vertical space when the hero-chart container
+// grows (ADR 004 — price stays dominant). Re-pinned on resize because
+// lightweight-charts otherwise rebalances toward 50/50.
+const VOLUME_PANE_HEIGHT = 96
 function indicatorLineStyle(kind: IndicatorKind): number {
   return kind === 'vwap' ? LINE_STYLE_DASHED : LINE_STYLE_SOLID
 }
@@ -146,7 +152,6 @@ export default function PriceChart({
   row,
   timeframe,
   onTimeframeChange,
-  height = 240,
 }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -190,7 +195,7 @@ export default function PriceChart({
     const priceLines = priceLinesRef.current
     const chart = createChart(container, {
       width: container.clientWidth,
-      height,
+      height: container.clientHeight || FALLBACK_CHART_HEIGHT,
       layout: {
         background: { color: 'transparent' },
         textColor: COLOR_TEXT,
@@ -238,7 +243,17 @@ export default function PriceChart({
     lastFirstBarTimeRef.current = null
 
     const observer = new ResizeObserver(() => {
-      chart.applyOptions({ width: container.clientWidth })
+      // Container-driven sizing. The chart fills whatever height the
+      // flex parent hands down (ADR 004 hero-chart contract) — width
+      // and height are both re-applied so a viewport resize, a
+      // timeframe-row reflow, or a sidebar-grow all reach the chart.
+      chart.applyOptions({
+        width: container.clientWidth,
+        height: container.clientHeight || FALLBACK_CHART_HEIGHT,
+      })
+      // Re-pin the volume pane height after a resize so the split
+      // between price and volume doesn't drift back toward 50/50.
+      chart.panes()[1]?.setHeight(VOLUME_PANE_HEIGHT)
       positionMacroBand(chart, macroBandRef.current, macroWindowRef.current)
       positionSetupRangeBand(
         candles,
@@ -275,7 +290,7 @@ export default function PriceChart({
       priceLines.length = 0
       markersRef.current = null
     }
-  }, [height, hasBars])
+  }, [hasBars])
 
   // Apply the payload to the live chart. Runs on mount (right after
   // the chart is created) and on every row change delivered by the
@@ -415,15 +430,14 @@ export default function PriceChart({
 
   if (!hasBars) {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex h-full min-h-0 flex-col gap-2">
         <div className="flex justify-end">
           <TimeframeSelector value={timeframe} onChange={onTimeframeChange} />
         </div>
         <div
           role="status"
           aria-label={`${row.instrument.displayName} price chart`}
-          className="border-border bg-muted/10 text-muted-foreground flex items-center justify-center rounded-md border border-dashed text-xs"
-          style={{ height }}
+          className="border-border bg-muted/10 text-muted-foreground flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed text-xs"
         >
           No price data
         </div>
@@ -432,16 +446,20 @@ export default function PriceChart({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    // h-full + min-h-0 so the chart wrapper absorbs the vertical space
+    // the PrimaryInstrumentPanel hands down. The inner chart container
+    // sits inside a flex-1 frame so lightweight-charts can read its
+    // height via container.clientHeight and grow to fit.
+    <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="flex justify-end">
         <TimeframeSelector value={timeframe} onChange={onTimeframeChange} />
       </div>
-      <div className="border-border bg-card/40 relative overflow-hidden rounded-md border">
+      <div className="border-border bg-card/40 relative min-h-0 flex-1 overflow-hidden rounded-md border">
         <div
           ref={containerRef}
           aria-label={`${row.instrument.displayName} price chart`}
           role="img"
-          style={{ height }}
+          className="h-full w-full"
         />
         {row.setup?.setupRange && row.setup && (
           <>

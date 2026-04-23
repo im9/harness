@@ -29,20 +29,18 @@ describe('Dashboard route', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders one banner per tracked instrument once data is loaded', () => {
+  it('renders one state banner for the primary instrument', () => {
     useDashboardMock.mockReturnValue({
       data: dashboardDefault,
       loading: false,
       error: null,
     })
     render(<Dashboard />)
-    // StateBanner uses role=status — one per instrument row. This
-    // asserts the route wires the payload's `rows` array into the
-    // layout.
+    // ADR 004 Phase 1 centers on a single primary instrument. The route
+    // wires `data.primary` into a single StateBanner; role=status is the
+    // banner's accessible affordance.
     const banners = screen.getAllByRole('status')
-    // The dashboard itself doesn't add a role=status wrapper once data
-    // is present, so the only status regions are from the state banners.
-    expect(banners).toHaveLength(dashboardDefault.rows.length)
+    expect(banners).toHaveLength(1)
   })
 
   it('exposes the session status strip as a labeled landmark', () => {
@@ -57,31 +55,51 @@ describe('Dashboard route', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders the rule gauge once per instrument row', () => {
+  it('renders the rule gauge once for the primary panel', () => {
     useDashboardMock.mockReturnValue({
       data: dashboardDefault,
       loading: false,
       error: null,
     })
     render(<Dashboard />)
-    // ADR 004 layout: the rule gauge sits at the bottom of each
-    // instrument row so the cap state is readable without scrolling
-    // back to a global header — hence N progressbars for N rows.
-    expect(screen.getAllByRole('progressbar')).toHaveLength(
-      dashboardDefault.rows.length,
-    )
+    // ADR 004 layout: the rule gauge sits at the bottom of the primary
+    // panel so the cap state is readable without scrolling back to a
+    // global header. Exactly one gauge since Phase 1 has one primary.
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1)
   })
 
-  it('shows each instrument display name', () => {
+  it("shows the primary instrument's display name", () => {
     useDashboardMock.mockReturnValue({
       data: dashboardDefault,
       loading: false,
       error: null,
     })
     render(<Dashboard />)
-    for (const row of dashboardDefault.rows) {
-      expect(screen.getByText(row.instrument.displayName)).toBeInTheDocument()
-    }
+    expect(
+      screen.getByText(dashboardDefault.primary.instrument.displayName),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the primary panel and right-column widgets as landmarks', () => {
+    useDashboardMock.mockReturnValue({
+      data: dashboardDefault,
+      loading: false,
+      error: null,
+    })
+    render(<Dashboard />)
+    // ADR 004 Dashboard layout: a left primary panel plus a right
+    // widget column (Watchlist above NewsFeed). Asserting on accessible
+    // landmark names keeps the test stable across the visual reshape
+    // and lets screen readers navigate the two surfaces.
+    expect(
+      screen.getByRole('region', { name: /primary instrument/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('complementary', { name: /watchlist/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('complementary', { name: /news/i }),
+    ).toBeInTheDocument()
   })
 
   it('shows an alert and keeps the snapshot when a stream error arrives', () => {

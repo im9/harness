@@ -21,12 +21,14 @@ import {
 // describes the protocol; this is the frontend-side stand-in until the
 // real `MarketDataProvider` + `SetupEngine` pipeline is wired up.
 //
-// Multi-timeframe: per instrument we keep an independent bar series per
-// timeframe (10s / 1m / 5m / ... / 1w). getSnapshot accepts a
-// `timeframes: { [symbol]: Timeframe }` map and returns the matching
-// series for each row. All series advance against wall clock on every
+// Multi-timeframe: for the primary instrument we keep an independent bar
+// series per timeframe (10s / 1m / 5m / ... / 1w). getSnapshot accepts
+// a `timeframes: { [symbol]: Timeframe }` map and returns the series
+// for the primary. All series advance against wall clock on every
 // snapshot so switching timeframes mid-session shows a current chart,
-// not one frozen at the moment the UI first subscribed.
+// not one frozen at the moment the UI first subscribed. Watchlist
+// entries and news pass through unchanged in Phase 1 (c); their live
+// behavior is part of the later widget steps (d) / (e).
 
 const BAR_COUNT = 120
 const PNL_STEP_MIN = 15
@@ -162,29 +164,30 @@ export interface SnapshotOptions {
 
 export class MockBackend {
   private base: DashboardPayload
-  private seriesBySymbol: Map<string, SeriesMap>
+  private primarySeries: SeriesMap
   private pnlStartSec: number
 
   constructor(seed?: DashboardPayload) {
     this.base = structuredClone(seed ?? dashboardDefault)
-    this.seriesBySymbol = new Map()
 
-    const nowSec =
-      this.base.rows[0]?.bars.at(-1)?.time ?? Math.floor(Date.now() / 1000)
-    for (const row of this.base.rows) {
-      const map = buildSeriesMap(row, nowSec)
-      // If the seed brought its own bar history, respect it for the tf
-      // whose cadence matches — handy for tests that hand in a specific
-      // fixture and want the assertions to land against exactly those
-      // bars rather than a synthesized replacement.
-      if (row.bars.length >= 2) {
-        const step = row.bars[row.bars.length - 1].time - row.bars[row.bars.length - 2].time
-        const matched = TIMEFRAMES.find((tf) => TIMEFRAME_SEC[tf] === step)
-        if (matched) {
-          map.set(matched, { bars: [...row.bars], indicators: row.indicators.map((i) => ({ ...i, points: [...i.points] })) })
-        }
+    const primary = this.base.primary
+    const nowSec = primary.bars.at(-1)?.time ?? Math.floor(Date.now() / 1000)
+
+    this.primarySeries = buildSeriesMap(primary, nowSec)
+    // If the seed brought its own bar history, respect it for the tf
+    // whose cadence matches — handy for tests that hand in a specific
+    // fixture and want the assertions to land against exactly those
+    // bars rather than a synthesized replacement.
+    if (primary.bars.length >= 2) {
+      const step =
+        primary.bars[primary.bars.length - 1].time - primary.bars[primary.bars.length - 2].time
+      const matched = TIMEFRAMES.find((tf) => TIMEFRAME_SEC[tf] === step)
+      if (matched) {
+        this.primarySeries.set(matched, {
+          bars: [...primary.bars],
+          indicators: primary.indicators.map((i) => ({ ...i, points: [...i.points] })),
+        })
       }
-      this.seriesBySymbol.set(row.instrument.symbol, map)
     }
 
     this.pnlStartSec = nowSec - (this.base.intradayPnl.length - 1) * PNL_STEP_MIN * 60
@@ -194,39 +197,39 @@ export class MockBackend {
     const wallNow = options.nowSec ?? Math.floor(Date.now() / 1000)
     const tfMap = options.timeframes ?? {}
 
-    // Advance every tf for every symbol so switching mid-session shows
+    const primary = this.base.primary
+    const symbol = primary.instrument.symbol
+
+    // Advance every tf for the primary so switching mid-session shows
     // up-to-date bars without a catch-up lag.
-    for (const [symbol, seriesMap] of this.seriesBySymbol) {
-      const row = this.base.rows.find((r) => r.instrument.symbol === symbol)
-      if (!row) continue
-      for (const tf of TIMEFRAMES) {
-        const series = seriesMap.get(tf)
-        if (!series) continue
-        const rand = seededRandom(Math.floor(wallNow) ^ hashSeed(symbol, tf))
-        const advanced = advanceSeries(series, tf, wallNow, row, rand)
-        seriesMap.set(tf, advanced)
-      }
+    for (const tf of TIMEFRAMES) {
+      const series = this.primarySeries.get(tf)
+      if (!series) continue
+      const rand = seededRandom(Math.floor(wallNow) ^ hashSeed(symbol, tf))
+      const advanced = advanceSeries(series, tf, wallNow, primary, rand)
+      this.primarySeries.set(tf, advanced)
     }
 
     const intradayPnl = extendPnl(this.base.intradayPnl, wallNow, this.pnlStartSec)
     this.base = { ...this.base, intradayPnl }
 
-    const rows = this.base.rows.map((row) => {
-      const tf = tfMap[row.instrument.symbol] ?? DEFAULT_TIMEFRAME
-      const series = this.seriesBySymbol.get(row.instrument.symbol)?.get(tf)
-      const bars = series?.bars ?? []
-      const indicators = series?.indicators ?? []
-      const last = bars[bars.length - 1]
-      return {
-        ...row,
-        bars,
-        indicators,
-        lastPrice: last?.close ?? row.lastPrice,
-        lastPriceAt: last ? new Date(last.time * 1000).toISOString() : row.lastPriceAt,
-      }
-    })
+    const tf = tfMap[symbol] ?? DEFAULT_TIMEFRAME
+    const series = this.primarySeries.get(tf)
+    const bars = series?.bars ?? []
+    const indicators = series?.indicators ?? []
+    const last = bars[bars.length - 1]
+    const primarySnapshot: InstrumentRowState = {
+      ...primary,
+      bars,
+      indicators,
+      lastPrice: last?.close ?? primary.lastPrice,
+      lastPriceAt: last ? new Date(last.time * 1000).toISOString() : primary.lastPriceAt,
+    }
 
-    return structuredClone({ ...this.base, rows })
+    return structuredClone({
+      ...this.base,
+      primary: primarySnapshot,
+    })
   }
 }
 

@@ -15,9 +15,9 @@ export default function AppShell() {
   }
 
   return (
-    <div className="bg-background text-foreground flex min-h-dvh flex-col">
+    <div className="bg-background text-foreground flex h-dvh flex-col">
       <header className="border-border bg-background border-b">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
+        <div className="mx-auto flex h-14 w-full max-w-screen-2xl items-center gap-6 px-4">
           <Link to="/" className="text-sm font-semibold tracking-tight">
             harness
           </Link>
@@ -52,8 +52,12 @@ export default function AppShell() {
           </div>
         </div>
       </header>
-      <main className="flex-1">
-        <div className="mx-auto max-w-6xl px-4 py-6">
+      {/* Dashboard is the hero viewport (ADR 004): the primary chart
+          must fill the space below the nav. Route content owns its own
+          scroll — this shell gives it a fixed-height flex container
+          rather than a page-scrolling wrapper. */}
+      <main className="flex min-h-0 flex-1 flex-col">
+        <div className="mx-auto flex h-full w-full max-w-screen-2xl min-h-0 flex-col px-4 py-4">
           <Outlet />
         </div>
       </main>

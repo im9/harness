@@ -26,7 +26,24 @@ function payloadProps(
       cooldownUntil: null,
       quoteCurrency: 'USD',
     },
-    rows: [],
+    primary: {
+      instrument: {
+        symbol: 'FUT-A',
+        displayName: 'Mock Future A',
+        tickSize: 0.25,
+        tickValue: 5,
+        quoteCurrency: 'USD',
+      },
+      state: 'HOLD',
+      setup: null,
+      lastPrice: 100,
+      lastPriceAt: '2026-04-23T09:45:00Z',
+      macro: null,
+      bars: [],
+      indicators: [],
+    },
+    watchlist: [],
+    news: [],
     ...overrides,
   }
   return {

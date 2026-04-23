@@ -30,24 +30,24 @@ function makePayload(tag: string): DashboardPayload {
       cooldownUntil: null,
       quoteCurrency: 'USD',
     },
-    rows: [
-      {
-        instrument: {
-          symbol: 'FUT-A',
-          displayName: tag,
-          tickSize: 0.25,
-          tickValue: 5,
-          quoteCurrency: 'USD',
-        },
-        state: 'HOLD',
-        setup: null,
-        lastPrice: 0,
-        lastPriceAt: '2026-04-23T09:45:00Z',
-        macro: null,
-        bars: [],
-        indicators: [],
+    primary: {
+      instrument: {
+        symbol: 'FUT-A',
+        displayName: tag,
+        tickSize: 0.25,
+        tickValue: 5,
+        quoteCurrency: 'USD',
       },
-    ],
+      state: 'HOLD',
+      setup: null,
+      lastPrice: 0,
+      lastPriceAt: '2026-04-23T09:45:00Z',
+      macro: null,
+      bars: [],
+      indicators: [],
+    },
+    watchlist: [],
+    news: [],
   }
 }
 
@@ -72,7 +72,7 @@ describe('useDashboard', () => {
     expect(result.current.data).toBeNull()
 
     await waitFor(() => {
-      expect(result.current.data?.rows[0].instrument.displayName).toBe('initial')
+      expect(result.current.data?.primary.instrument.displayName).toBe('initial')
     })
     expect(result.current.loading).toBe(false)
   })
@@ -88,7 +88,7 @@ describe('useDashboard', () => {
     const { result } = renderHook(() => useDashboard())
 
     await waitFor(() => {
-      expect(result.current.data?.rows[0].instrument.displayName).toBe('initial')
+      expect(result.current.data?.primary.instrument.displayName).toBe('initial')
     })
 
     // Simulate the SSE stream delivering a newer payload. Pushes must
@@ -97,7 +97,7 @@ describe('useDashboard', () => {
     act(() => {
       captured!.onData(makePayload('pushed'))
     })
-    expect(result.current.data?.rows[0].instrument.displayName).toBe('pushed')
+    expect(result.current.data?.primary.instrument.displayName).toBe('pushed')
   })
 
   it('surfaces stream errors without clobbering the last good payload', async () => {
@@ -110,7 +110,7 @@ describe('useDashboard', () => {
 
     const { result } = renderHook(() => useDashboard())
     await waitFor(() => {
-      expect(result.current.data?.rows[0].instrument.displayName).toBe('good')
+      expect(result.current.data?.primary.instrument.displayName).toBe('good')
     })
 
     act(() => {
@@ -120,7 +120,7 @@ describe('useDashboard', () => {
     // gracefully (UI can badge "stale" over the previous snapshot
     // instead of going blank).
     expect(result.current.error?.message).toBe('stream blip')
-    expect(result.current.data?.rows[0].instrument.displayName).toBe('good')
+    expect(result.current.data?.primary.instrument.displayName).toBe('good')
   })
 
   it('unsubscribes when the component unmounts', async () => {

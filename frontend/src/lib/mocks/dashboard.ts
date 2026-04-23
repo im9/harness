@@ -3,6 +3,9 @@ import type {
   DashboardPayload,
   IndicatorLine,
   IndicatorPoint,
+  NewsItem,
+  SparklinePoint,
+  WatchlistItem,
 } from '../dashboard-types'
 
 // Deterministic dashboard scenarios for the mock-first UI build (ADR 004
@@ -166,16 +169,118 @@ const FUT_A_BARS = generateBars(
   BAR_STEP_SEC,
 )
 
-const FUT_B_BARS = generateBars(
-  4242,
-  BAR_COUNT,
-  4_830,
-  4_829.75,
-  2.5,
-  0.5,
-  END_TIME_SEC,
-  BAR_STEP_SEC,
-)
+// Sparkline fidelity for the Watchlist widget. 40 points is enough to
+// read a shape at a glance without overwhelming the ~100 px mini-row
+// width; fewer points render as a jagged line, more points pack
+// visually into noise.
+const SPARKLINE_POINTS = 40
+
+function sparklineFromBars(bars: Bar[]): SparklinePoint[] {
+  const slice = bars.slice(-SPARKLINE_POINTS)
+  return slice.map((bar) => ({ time: bar.time, value: bar.close }))
+}
+
+function generateWatchlistItem(
+  seed: number,
+  instrument: WatchlistItem['instrument'],
+  state: WatchlistItem['state'],
+  centerPrice: number,
+  lastPrice: number,
+  volatility: number,
+): WatchlistItem {
+  const bars = generateBars(
+    seed,
+    BAR_COUNT,
+    centerPrice,
+    lastPrice,
+    volatility,
+    instrument.tickSize,
+    END_TIME_SEC,
+    BAR_STEP_SEC,
+  )
+  return {
+    instrument,
+    state,
+    lastPrice,
+    lastPriceAt: END_ISO,
+    sparkline: sparklineFromBars(bars),
+  }
+}
+
+const WATCHLIST: WatchlistItem[] = [
+  generateWatchlistItem(
+    4242,
+    {
+      symbol: 'FUT-B',
+      displayName: 'Mock Future B',
+      tickSize: 0.5,
+      tickValue: 10,
+      quoteCurrency: 'USD',
+    },
+    'HOLD',
+    4_830,
+    4_829.75,
+    2.5,
+  ),
+  generateWatchlistItem(
+    9001,
+    {
+      symbol: 'FUT-C',
+      displayName: 'Mock Future C',
+      tickSize: 0.1,
+      tickValue: 10,
+      quoteCurrency: 'USD',
+    },
+    'RETREAT',
+    310.2,
+    308.4,
+    0.4,
+  ),
+  generateWatchlistItem(
+    1717,
+    {
+      symbol: 'FUT-D',
+      displayName: 'Mock Future D',
+      tickSize: 0.01,
+      tickValue: 1,
+      quoteCurrency: 'USD',
+    },
+    'EXIT',
+    42.6,
+    42.91,
+    0.08,
+  ),
+]
+
+// Hand-authored headlines — no real sources, no real instruments
+// (CLAUDE.md privacy rule). Offsets are relative to END_TIME_SEC so the
+// feed always reads as "recent" no matter when the module loads.
+const NEWS_ITEMS: NewsItem[] = [
+  {
+    id: 'news-1',
+    title: 'Mock wire: central bank officials signal cautious stance',
+    impactTier: 'high',
+    at: new Date((END_TIME_SEC - 2 * 60) * 1000).toISOString(),
+  },
+  {
+    id: 'news-2',
+    title: 'Mock wire: energy inventories print below consensus',
+    impactTier: 'medium',
+    at: new Date((END_TIME_SEC - 14 * 60) * 1000).toISOString(),
+  },
+  {
+    id: 'news-3',
+    title: 'Mock wire: equity futures trim gains into the open',
+    impactTier: 'low',
+    at: new Date((END_TIME_SEC - 35 * 60) * 1000).toISOString(),
+  },
+  {
+    id: 'news-4',
+    title: 'Mock wire: rate-path expectations edge higher',
+    impactTier: 'medium',
+    at: new Date((END_TIME_SEC - 72 * 60) * 1000).toISOString(),
+  },
+]
 
 export const dashboardDefault: DashboardPayload = {
   sessionPhase: 'open',
@@ -193,67 +298,44 @@ export const dashboardDefault: DashboardPayload = {
     cooldownUntil: null,
     quoteCurrency: 'USD',
   },
-  rows: [
-    {
-      instrument: {
-        symbol: 'FUT-A',
-        displayName: 'Mock Future A',
-        tickSize: 0.25,
-        tickValue: 5,
-        quoteCurrency: 'USD',
-      },
-      state: 'ENTER',
-      setup: {
-        setupName: 'Opening range break',
-        side: 'long',
-        target: { price: 17_620.5, label: '+2R' },
-        retreat: { price: 17_548.75, label: 'stop' },
-        rMultiple: 0.4,
-        setupRange: {
-          upper: { price: 17_595, label: 'ORH' },
-          lower: { price: 17_560, label: 'ORL' },
-          midline: { price: 17_577.5, label: 'OR mid' },
-        },
-      },
-      lastPrice: 17_582.25,
-      lastPriceAt: END_ISO,
-      macro: null,
-      bars: FUT_A_BARS,
-      indicators: emaPair(FUT_A_BARS),
+  primary: {
+    instrument: {
+      symbol: 'FUT-A',
+      displayName: 'Mock Future A',
+      tickSize: 0.25,
+      tickValue: 5,
+      quoteCurrency: 'USD',
     },
-    {
-      instrument: {
-        symbol: 'FUT-B',
-        displayName: 'Mock Future B',
-        tickSize: 0.5,
-        tickValue: 10,
-        quoteCurrency: 'USD',
+    state: 'ENTER',
+    setup: {
+      setupName: 'Opening range break',
+      side: 'long',
+      target: { price: 17_620.5, label: '+2R' },
+      retreat: { price: 17_548.75, label: 'stop' },
+      rMultiple: 0.4,
+      setupRange: {
+        upper: { price: 17_595, label: 'ORH' },
+        lower: { price: 17_560, label: 'ORL' },
+        midline: { price: 17_577.5, label: 'OR mid' },
       },
-      state: 'HOLD',
-      setup: {
-        setupName: 'VWAP reclaim',
-        side: 'short',
-        target: { price: 4_812.0, label: '+1.5R' },
-        retreat: { price: 4_847.5, label: 'invalidation' },
-        rMultiple: 0,
-        setupRange: null,
-      },
-      lastPrice: 4_829.75,
-      lastPriceAt: END_ISO,
-      macro: {
-        eventName: 'Macro release A',
-        impactTier: 'high',
-        phase: 'event',
-        startsAt: MACRO_START_ISO,
-        endsAt: MACRO_END_ISO,
-      },
-      bars: FUT_B_BARS,
-      indicators: [
-        ...emaPair(FUT_B_BARS),
-        { name: 'VWAP', kind: 'vwap', points: computeVwap(FUT_B_BARS) },
-      ],
     },
-  ],
+    lastPrice: 17_582.25,
+    lastPriceAt: END_ISO,
+    macro: {
+      eventName: 'Macro release A',
+      impactTier: 'high',
+      phase: 'event',
+      startsAt: MACRO_START_ISO,
+      endsAt: MACRO_END_ISO,
+    },
+    bars: FUT_A_BARS,
+    indicators: [
+      ...emaPair(FUT_A_BARS),
+      { name: 'VWAP', kind: 'vwap', points: computeVwap(FUT_A_BARS) },
+    ],
+  },
+  watchlist: WATCHLIST,
+  news: NEWS_ITEMS,
 }
 
 export const dashboardScenarios = {

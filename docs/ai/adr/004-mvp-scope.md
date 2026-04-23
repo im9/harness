@@ -277,11 +277,13 @@ mock-first against the payload contract; backend follows.
     - [x] Macro event vertical band
     - [x] Setup range shading
     - [x] Volume pane
-  - [ ] (c) Layout reshape: `PrimaryInstrumentPanel` (left) +
+  - [x] (c) Layout reshape: `PrimaryInstrumentPanel` (left) +
         right-side widget column. Payload contract replaces
         `rows: InstrumentRowState[]` with `primary: InstrumentRowState`,
         `watchlist: WatchlistItem[]` (lighter shape — state badge,
         last price, sparkline points), and `news: NewsItem[]`.
+        `Watchlist` / `NewsFeed` ship as layout-only stubs; content
+        lands in (d) / (e).
   - [ ] (d) `Watchlist` widget — mini row per secondary instrument
         (state badge + last price + sparkline). No full chart; reuses
         a lightweight sparkline primitive rather than instantiating a
