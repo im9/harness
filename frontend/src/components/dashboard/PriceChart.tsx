@@ -178,6 +178,13 @@ export default function PriceChart({
   // auto-fit: fit once on mount, re-fit when timeframe changes, and
   // leave the user's zoom alone when only a new bar was appended.
   const lastFirstBarTimeRef = useRef<number | null>(null)
+  // Tracks the symbol we last fit for. Swapping to a different
+  // instrument (ADR 004 swap mechanics) might happen to land on the
+  // same first-bar time (both series seeded against the same wall
+  // clock) yet cover a wildly different price range — without this
+  // guard the chart keeps the previous instrument's zoom and renders
+  // a squished or out-of-frame candle run.
+  const lastSymbolRef = useRef<string | null>(null)
   const hasBars = row.bars.length > 0
 
   // Create the chart once per mount (re-creation only if `height` or
@@ -241,6 +248,7 @@ export default function PriceChart({
     candlesRef.current = candles
     volumeRef.current = volume
     lastFirstBarTimeRef.current = null
+    lastSymbolRef.current = null
 
     const observer = new ResizeObserver(() => {
       // Container-driven sizing. The chart fills whatever height the
@@ -406,9 +414,14 @@ export default function PriceChart({
     }
 
     const firstBarTime = row.bars[0]?.time ?? 0
-    if (lastFirstBarTimeRef.current !== firstBarTime) {
+    const symbol = row.instrument.symbol
+    if (
+      lastFirstBarTimeRef.current !== firstBarTime ||
+      lastSymbolRef.current !== symbol
+    ) {
       chart.timeScale().fitContent()
       lastFirstBarTimeRef.current = firstBarTime
+      lastSymbolRef.current = symbol
     }
 
     macroWindowRef.current = row.macro

@@ -384,14 +384,17 @@ mock-first against the payload contract; backend follows.
         displayName + last + pctChange), structurally distinct from
         `Instrument`. Payload drops `intradayPnl`, `sessionPhase`,
         `nextMacroEvent`; adds `markets: MarketIndex[]`.
-  - [ ] (e) Swap mechanics. `Dashboard` owns a `primarySymbol`
-        state, initialized from the first tracked instrument.
-        Subscription re-opens when the symbol changes. The per-
-        instrument `timeframes` map is preserved across swaps so
-        each instrument remembers its last-chosen cadence.
-        `PriceChart` fits content on symbol change (pan / zoom are
-        reset since the price range is unrelated). Banner mount
-        animation runs naturally on swap — no special suppression.
+  - [x] (e) Swap mechanics. `Dashboard` owns a `primarySymbol`
+        state (`undefined` on initial load hands the choice to the
+        backend's seed default). `useDashboard({ primarySymbol })`
+        and the underlying REST / subscription client carry the
+        value through; the mock backend re-projects the payload
+        accordingly. The per-instrument `timeframes` map is
+        preserved across swaps so each instrument remembers its
+        last-chosen cadence. `PriceChart` tracks the active symbol
+        in a ref and calls `fitContent` when it changes, so a swap
+        never leaves the chart stuck on the previous instrument's
+        zoom.
   - [x] (f) State banner redesign (three-tier hero / sub / meta as
         described in "State banner hierarchy"). Hero instrument
         name is an `<h1>` and the largest text on the page; ticker
@@ -402,12 +405,17 @@ mock-first against the payload contract; backend follows.
         banner tone stays subtle (RETREAT gets a slightly louder
         treatment for "close now" salience). Required adding
         `Instrument.venue: string` to the payload contract.
-  - [ ] (g) `Watchlist` widget — mini row per non-primary tracked
-        instrument. Row shows ticker · display name · state dot ·
-        pctChange · sparkline · last price. Row is a button — click
-        invokes the swap handler. Sparkline is a self-rolled SVG
-        primitive (polyline + optional last-point dot), **not** a
-        second `lightweight-charts` instance per row.
+  - [x] (g) `Watchlist` widget — one mini-row `<button>` per
+        non-primary tracked instrument. Row lays out: state dot ·
+        ticker + display name (stacked) · pctChange · sparkline ·
+        last price. Click invokes the swap handler from the
+        Dashboard route. Sparkline is the self-rolled
+        `Sparkline` SVG primitive (polyline + last-point dot,
+        emerald / rose per sign, flat-series fallback to a
+        center-pinned line) — no second `lightweight-charts`
+        instance per row. Last-price formatting derives decimals
+        from `instrument.tickSize` so the row value agrees with
+        the chart's candle closes for the same symbol.
   - [ ] (h) `NewsFeed` widget — streamed headline list (impact tag
         + time + title). Read-only.
   - [ ] (i) `AiChatFloat` — FAB bottom-right → right-aligned

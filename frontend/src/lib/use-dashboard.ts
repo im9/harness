@@ -8,14 +8,24 @@ export interface UseDashboardState {
   error: Error | null
 }
 
+export interface UseDashboardOptions {
+  timeframes?: Record<string, Timeframe>
+  // Which tracked instrument is currently focused as primary (ADR 004
+  // swap mechanics). `undefined` hands the choice to the backend's
+  // default — used on initial page load before any swap has happened.
+  primarySymbol?: string
+}
+
 // Push-based data flow: one REST fetch for initial paint, then a
 // subscription for live updates (SSE on the real backend, simulated
-// on the mock). When `timeframes` changes the hook reopens the
-// subscription to reflect the new per-symbol aggregation, mirroring
-// the real EventSource + query-param pattern.
+// on the mock). When `timeframes` or `primarySymbol` changes, the
+// hook reopens the subscription so the server re-projects the payload
+// with the new focus — same EventSource + query-param pattern the
+// real backend will use.
 export function useDashboard(
-  timeframes?: Record<string, Timeframe>,
+  options: UseDashboardOptions = {},
 ): UseDashboardState {
+  const { timeframes, primarySymbol } = options
   const [data, setData] = useState<DashboardPayload | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
@@ -28,7 +38,7 @@ export function useDashboard(
     let cancelled = false
     const tfs = JSON.parse(tfKey) as Record<string, Timeframe>
 
-    getDashboard({ timeframes: tfs })
+    getDashboard({ timeframes: tfs, primarySymbol })
       .then((payload) => {
         if (!cancelled) {
           setData(payload)
@@ -43,6 +53,7 @@ export function useDashboard(
 
     const unsubscribe = subscribeDashboard({
       timeframes: tfs,
+      primarySymbol,
       onData: (payload) => {
         if (!cancelled) {
           setData(payload)
@@ -58,7 +69,7 @@ export function useDashboard(
       cancelled = true
       unsubscribe()
     }
-  }, [tfKey])
+  }, [tfKey, primarySymbol])
 
   return { data, loading: data === null && error === null, error }
 }

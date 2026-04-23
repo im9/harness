@@ -10,12 +10,20 @@ import { useDashboard } from '@/lib/use-dashboard'
 const DEFAULT_TIMEFRAME: Timeframe = '10s'
 
 export default function Dashboard() {
-  // Per-symbol timeframe selection. Phase 1 has a single primary, but
-  // the map shape is kept so the mock backend's multi-tf advance path
-  // stays exercised and the eventual SSE URL pattern (symbol → tf)
-  // requires no reshape.
+  // Per-symbol timeframe selection. The map is preserved across swaps
+  // so each instrument remembers its last-chosen cadence (ADR 004 §Swap
+  // mechanics). Undefined entries fall back to DEFAULT_TIMEFRAME on the
+  // backend.
   const [timeframes, setTimeframes] = useState<Record<string, Timeframe>>({})
-  const { data, loading, error } = useDashboard(timeframes)
+  // `primarySymbol` is undefined on initial load — the backend picks
+  // its configured default. A watchlist row click sets it to the
+  // clicked instrument; the displaced primary moves back into the
+  // watchlist via the backend's re-projection (ADR 004 §Swap is a
+  // view-level action).
+  const [primarySymbol, setPrimarySymbol] = useState<string | undefined>(
+    undefined,
+  )
+  const { data, loading, error } = useDashboard({ timeframes, primarySymbol })
 
   const handleTimeframeChange = useCallback(
     (symbol: string, next: Timeframe) => {
@@ -23,6 +31,10 @@ export default function Dashboard() {
     },
     [],
   )
+
+  const handleSwapPrimary = useCallback((symbol: string) => {
+    setPrimarySymbol(symbol)
+  }, [])
 
   if (loading) {
     return (
@@ -45,8 +57,14 @@ export default function Dashboard() {
     )
   }
 
-  const primarySymbol = data.primary.instrument.symbol
-  const tf = timeframes[primarySymbol] ?? DEFAULT_TIMEFRAME
+  // Active primary: the symbol the backend actually returned in the
+  // payload, not the request-side state. They usually match, but on
+  // the very first render before the hook resolves the request,
+  // `primarySymbol` (state) is undefined while `data.primary.instrument.symbol`
+  // is the backend default — using the payload-side value keeps
+  // timeframe lookups correct in both cases.
+  const activeSymbol = data.primary.instrument.symbol
+  const tf = timeframes[activeSymbol] ?? DEFAULT_TIMEFRAME
 
   return (
     // ADR 004 Dashboard topology: a fixed-height canvas, not a
@@ -68,14 +86,14 @@ export default function Dashboard() {
           row={data.primary}
           rule={data.rule}
           timeframe={tf}
-          onTimeframeChange={(next) => handleTimeframeChange(primarySymbol, next)}
+          onTimeframeChange={(next) => handleTimeframeChange(activeSymbol, next)}
         />
         {/* Right column splits the remaining height between Watchlist
             and NewsFeed (ADR 004 layout — each widget is a flex-1
             stripe inside the column). Overflow inside each widget is
             the widget's own concern (d)(e), not the column's. */}
         <div className="flex min-h-0 flex-col gap-4">
-          <Watchlist items={data.watchlist} />
+          <Watchlist items={data.watchlist} onSwap={handleSwapPrimary} />
           <NewsFeed items={data.news} />
         </div>
       </div>

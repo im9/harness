@@ -17,32 +17,43 @@ const MOCK_STREAM_INTERVAL_MS = 1000
 
 export interface FetchOptions {
   timeframes?: Record<string, Timeframe>
+  primarySymbol?: string
 }
 
-export async function getDashboard(options: FetchOptions = {}): Promise<DashboardPayload> {
+export async function getDashboard(
+  options: FetchOptions = {},
+): Promise<DashboardPayload> {
   await new Promise((resolve) => setTimeout(resolve, SIMULATED_LATENCY_MS))
-  return getMockBackend().getSnapshot({ timeframes: options.timeframes })
+  return getMockBackend().getSnapshot({
+    timeframes: options.timeframes,
+    primarySymbol: options.primarySymbol,
+  })
 }
 
 export interface DashboardSubscriber {
   onData: (payload: DashboardPayload) => void
   onError?: (err: Error) => void
   timeframes?: Record<string, Timeframe>
+  primarySymbol?: string
 }
 
 export function subscribeDashboard(subscriber: DashboardSubscriber): () => void {
   // Real implementation will open an EventSource against the backend
   // stream endpoint and forward `message` events / `error` events to
-  // the subscriber. When `timeframes` changes, the caller should close
-  // the current subscription and open a new one — matching the real
-  // EventSource + query-param pattern where the URL fully encodes the
-  // server's per-symbol aggregation choice.
+  // the subscriber. When `timeframes` or `primarySymbol` changes, the
+  // caller closes the current subscription and opens a new one —
+  // matching the real EventSource + query-param pattern where the URL
+  // fully encodes the server's per-instrument aggregation choice and
+  // primary focus.
   let cancelled = false
   const timer = setInterval(() => {
     if (cancelled) return
     try {
       subscriber.onData(
-        getMockBackend().getSnapshot({ timeframes: subscriber.timeframes }),
+        getMockBackend().getSnapshot({
+          timeframes: subscriber.timeframes,
+          primarySymbol: subscriber.primarySymbol,
+        }),
       )
     } catch (err) {
       subscriber.onError?.(err instanceof Error ? err : new Error(String(err)))

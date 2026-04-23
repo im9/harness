@@ -1,13 +1,17 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { dashboardDefault } from '@/lib/mocks/dashboard'
-import type { UseDashboardState } from '@/lib/use-dashboard'
+import type {
+  UseDashboardOptions,
+  UseDashboardState,
+} from '@/lib/use-dashboard'
 
 // Stub the data-flow hook so the route test stays focused on layout
 // behavior instead of the SSE / REST plumbing, which has its own
 // dedicated tests in `use-dashboard.test.tsx`.
 const { useDashboardMock } = vi.hoisted(() => ({
-  useDashboardMock: vi.fn<() => UseDashboardState>(),
+  useDashboardMock: vi.fn<(options?: UseDashboardOptions) => UseDashboardState>(),
 }))
 
 vi.mock('@/lib/use-dashboard', () => ({
@@ -127,5 +131,41 @@ describe('Dashboard route', () => {
     })
     render(<Dashboard />)
     expect(screen.getByRole('alert')).toHaveTextContent(/unreachable/i)
+  })
+
+  it('re-requests the dashboard with the clicked symbol when a watchlist row is clicked', async () => {
+    // ADR 004 §Swap is a view-level action: clicking a watchlist row
+    // sets `primarySymbol`, which flows through `useDashboard` so the
+    // backend re-projects the payload. Mocking the hook lets us
+    // observe that the primarySymbol argument actually changes — the
+    // rest (subscription re-open, chart fit, etc.) is the hook's /
+    // backend's job and is covered in their own tests.
+    useDashboardMock.mockReturnValue({
+      data: dashboardDefault,
+      loading: false,
+      error: null,
+    })
+    const user = userEvent.setup()
+    render(<Dashboard />)
+
+    // Initial render: primarySymbol is undefined — the backend picks
+    // its configured default.
+    expect(useDashboardMock).toHaveBeenCalledWith(
+      expect.objectContaining({ primarySymbol: undefined }),
+    )
+
+    const firstSecondary = dashboardDefault.watchlist[0]
+    await user.click(
+      screen.getByRole('button', {
+        name: new RegExp(firstSecondary.instrument.symbol),
+      }),
+    )
+
+    // After the click, the hook is called with the clicked symbol.
+    expect(useDashboardMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        primarySymbol: firstSecondary.instrument.symbol,
+      }),
+    )
   })
 })
