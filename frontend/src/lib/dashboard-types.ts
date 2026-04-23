@@ -149,6 +149,15 @@ export interface WatchlistItem {
   state: RecommendationState
   lastPrice: number
   lastPriceAt: string
+  // Percent change from the instrument's session anchor (per-instrument
+  // choice on the backend — JP equities anchor to the morning open,
+  // USD/JPY to the prior NY close, US index futures to the prior
+  // settle). The frontend displays this as +X.XX% / -X.XX% with
+  // sign-driven color; it is the primary "today's story" readout for a
+  // mini row and drives the agreement-check glance the widget exists
+  // for. Payload carries a pre-computed number so the chart and the
+  // engine agree on the same anchor.
+  pctChange: number
   sparkline: SparklinePoint[]
 }
 
@@ -178,10 +187,17 @@ export interface DashboardPayload {
   nextMacroEvent: NextMacroEvent | null
   intradayPnl: PnlPoint[]
   rule: RuleOverlayState
-  // Phase 1 centers on a single primary instrument (ADR 004). Multi-
-  // primary layouts grow into successor ADRs per asset class rather
-  // than being retrofitted here.
+  // The active primary instrument — the one the dashboard is currently
+  // focused on (ADR 004: "primary is a view mode, not a fixed
+  // property"). The engine tracks state for every operator-configured
+  // instrument; `primary` is simply whichever one has the hero chart
+  // right now. Swapping the primary re-projects the payload.
   primary: InstrumentRowState
+  // Every *other* tracked instrument. The active primary is NEVER
+  // present here — the two surfaces never duplicate the same
+  // instrument (ADR 004 layout contract). Clicking a watchlist item
+  // promotes it to primary; the displaced primary slides back into
+  // this array.
   watchlist: WatchlistItem[]
   news: NewsItem[]
 }

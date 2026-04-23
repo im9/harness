@@ -3,19 +3,39 @@ import type {
   DashboardPayload,
   IndicatorLine,
   IndicatorPoint,
+  Instrument,
+  InstrumentRowState,
+  MacroEventWindow,
   NewsItem,
+  NextMacroEvent,
+  PnlPoint,
+  RuleOverlayState,
+  SessionPhase,
+  SetupContext,
   SparklinePoint,
   WatchlistItem,
 } from '../dashboard-types'
 
-// Deterministic dashboard scenarios for the mock-first UI build (ADR 004
-// development providers strategy). Each scenario is a fully-formed
-// DashboardPayload; the UI renders against these until the backend
-// MarketDataProvider / SetupEngine / RuleOverlay pipeline is wired up.
+// Mock data for the ADR 004 dashboard. The mock paints a plausible
+// Tokyo-session-on-a-Nikkei-mini-primary scene: realistic prices,
+// session-appropriate pctChanges, setups the engine would actually
+// evaluate. Placeholder instruments (FUT-A, etc.) were removed — per
+// ADR 004 §Configuration boundary, public market identifiers are
+// permitted in fixtures, and the operator-specific layer (chosen
+// subset, thresholds, vendors) is what must stay in the DB / .env.
 //
-// All symbols and setup names here are intentionally generic
-// placeholders — no references to real instruments or the operator's
-// tracked universe (CLAUDE.md privacy rule).
+// The mock exposes three layers:
+//
+// 1. `dashboardUniverse` — the full InstrumentRowState for every
+//    tracked instrument. Any member can be promoted to primary.
+// 2. `pctChangeOf` / `dashboardCommon` — per-instrument pctChange
+//    numbers and the cross-cutting data (rule state, intraday P&L,
+//    news, session phase, next macro event).
+// 3. `projectDashboard(primarySymbol?)` — projects the universe plus
+//    common data into a DashboardPayload with the requested symbol
+//    as the heavy `primary` and every *other* tracked instrument as
+//    a light `WatchlistItem` (ADR 004 layout contract — active
+//    primary is never duplicated in the watchlist).
 
 export function seededRandom(seed: number): () => number {
   // Linear congruential generator (Numerical Recipes constants).
@@ -28,9 +48,24 @@ export function seededRandom(seed: number): () => number {
   }
 }
 
+function tickSizeDecimals(tickSize: number): number {
+  // Derive the number of significant decimals from the tick size so
+  // `round` preserves precision for sub-cent ticks (USD/JPY at 0.001)
+  // without hard-coding a `* 100 / 100` that would silently drop the
+  // third decimal. String-parse is fine here: tickSize is a payload
+  // configuration value, not a hot-path arithmetic operand.
+  const str = tickSize.toString()
+  const dot = str.indexOf('.')
+  if (dot === -1) return 0
+  return str.length - dot - 1
+}
+
 export function round(n: number, tickSize: number): number {
   const ticks = Math.round(n / tickSize)
-  return Math.round(ticks * tickSize * 100) / 100
+  const raw = ticks * tickSize
+  const decimals = tickSizeDecimals(tickSize)
+  const factor = Math.pow(10, decimals)
+  return Math.round(raw * factor) / factor
 }
 
 export function generateBars(
@@ -89,7 +124,7 @@ export function computeEma(bars: Bar[], period: number): IndicatorPoint[] {
   let ema = bars[0].close
   return bars.map((bar) => {
     ema = bar.close * k + ema * (1 - k)
-    return { time: bar.time, value: Math.round(ema * 100) / 100 }
+    return { time: bar.time, value: Math.round(ema * 1e4) / 1e4 }
   })
 }
 
@@ -101,18 +136,30 @@ export function emaPair(bars: Bar[]): IndicatorLine[] {
 }
 
 export function computeVwap(bars: Bar[]): IndicatorPoint[] {
-  // Typical-price running mean as a stand-in for true VWAP. The
-  // payload's Bar type carries no volume yet (deferred with the volume
-  // pane), so every bar weights equally and this degenerates to a
-  // cumulative SMA of (H + L + C) / 3. Good enough to render a
-  // distinct mid-level reference line for the mock dashboard; a real
-  // vendor adapter will supply proper volume-weighted values.
-  let sum = 0
-  return bars.map((bar, i) => {
+  // Proper volume-weighted VWAP: Σ(typical × volume) / Σ(volume).
+  // Mock bars now carry volume so the indicator agrees with whatever
+  // setup reads it (e.g. "VWAP reclaim"). A real vendor adapter will
+  // supply session-anchored values; this streams from the first bar.
+  let num = 0
+  let den = 0
+  return bars.map((bar) => {
     const typical = (bar.high + bar.low + bar.close) / 3
-    sum += typical
-    return { time: bar.time, value: Math.round((sum / (i + 1)) * 100) / 100 }
+    num += typical * bar.volume
+    den += bar.volume
+    const value = den === 0 ? typical : num / den
+    return { time: bar.time, value: Math.round(value * 1e4) / 1e4 }
   })
+}
+
+// Sparkline fidelity for the Watchlist widget. 40 points is enough to
+// read a shape at a glance without overwhelming the ~100 px mini-row
+// width; fewer points render as a jagged line, more points pack
+// visually into noise.
+const SPARKLINE_POINTS = 40
+
+export function sparklineFromBars(bars: Bar[]): SparklinePoint[] {
+  const slice = bars.slice(-SPARKLINE_POINTS)
+  return slice.map((bar) => ({ time: bar.time, value: bar.close }))
 }
 
 // End the bar history at *now* so the initial chart is anchored to the
@@ -141,13 +188,13 @@ const MACRO_END_ISO = new Date(
   (END_TIME_SEC + MACRO_WINDOW_HALF_SEC) * 1000,
 ).toISOString()
 
-function intradayPnlCurve(): { t: string; pnl: number }[] {
-  // 5-min buckets across a 6-hour session. Values are hand-authored to
-  // produce a realistic-looking drawdown-then-partial-recovery shape.
+function intradayPnlCurve(): PnlPoint[] {
+  // 15-min buckets across a ~6 h session. Values are hand-authored to
+  // produce a realistic drawdown-then-partial-recovery shape.
   const buckets = [
-    0, 150, 320, 410, 280, 90, -120, -380, -620, -910, -1180, -1320,
-    -1450, -1510, -1420, -1360, -1240, -1180, -1100, -1080, -1120, -1060,
-    -980, -930,
+    0, 150, 320, 410, 280, 90, -120, -380, -620, -910, -1180, -1320, -1450,
+    -1510, -1420, -1360, -1240, -1180, -1100, -1080, -1120, -1060, -980,
+    -930,
   ]
   const start = 9 * 60
   return buckets.map((pnl, i) => {
@@ -158,185 +205,320 @@ function intradayPnlCurve(): { t: string; pnl: number }[] {
   })
 }
 
-const FUT_A_BARS = generateBars(
+// --- Per-instrument definitions ---------------------------------------
+
+// Nikkei 225 Mini: OSE, 5 index points / tick, ¥100 / index point → ¥500 / tick.
+// The most commonly day-traded Japan equity-index futures variant; ADR
+// 004 names it the bootstrap primary target.
+const NKM_INSTRUMENT: Instrument = {
+  symbol: 'NKM',
+  displayName: 'Nikkei 225 Mini',
+  tickSize: 5,
+  tickValue: 500,
+  quoteCurrency: 'JPY',
+}
+const NKM_BARS = generateBars(
   1337,
   BAR_COUNT,
-  17_570,
-  17_582.25,
-  6,
-  0.25,
+  38_500,
+  38_515,
+  25,
+  NKM_INSTRUMENT.tickSize,
   END_TIME_SEC,
   BAR_STEP_SEC,
 )
-
-// Sparkline fidelity for the Watchlist widget. 40 points is enough to
-// read a shape at a glance without overwhelming the ~100 px mini-row
-// width; fewer points render as a jagged line, more points pack
-// visually into noise.
-const SPARKLINE_POINTS = 40
-
-function sparklineFromBars(bars: Bar[]): SparklinePoint[] {
-  const slice = bars.slice(-SPARKLINE_POINTS)
-  return slice.map((bar) => ({ time: bar.time, value: bar.close }))
+const NKM_SETUP: SetupContext = {
+  setupName: 'Opening range break',
+  side: 'long',
+  target: { price: 38_655, label: '+2R' },
+  retreat: { price: 38_445, label: 'stop' },
+  rMultiple: 0.5,
+  setupRange: {
+    upper: { price: 38_550, label: 'ORH' },
+    lower: { price: 38_480, label: 'ORL' },
+    midline: { price: 38_515, label: 'OR mid' },
+  },
+}
+const NKM_MACRO: MacroEventWindow = {
+  eventName: 'BOJ press conference',
+  impactTier: 'high',
+  phase: 'event',
+  startsAt: MACRO_START_ISO,
+  endsAt: MACRO_END_ISO,
+}
+const NKM_ROW: InstrumentRowState = {
+  instrument: NKM_INSTRUMENT,
+  state: 'ENTER',
+  setup: NKM_SETUP,
+  lastPrice: 38_515,
+  lastPriceAt: END_ISO,
+  macro: NKM_MACRO,
+  bars: NKM_BARS,
+  indicators: [
+    ...emaPair(NKM_BARS),
+    { name: 'VWAP', kind: 'vwap', points: computeVwap(NKM_BARS) },
+  ],
 }
 
-function generateWatchlistItem(
-  seed: number,
-  instrument: WatchlistItem['instrument'],
-  state: WatchlistItem['state'],
-  centerPrice: number,
-  lastPrice: number,
-  volatility: number,
-): WatchlistItem {
-  const bars = generateBars(
-    seed,
-    BAR_COUNT,
-    centerPrice,
-    lastPrice,
-    volatility,
-    instrument.tickSize,
-    END_TIME_SEC,
-    BAR_STEP_SEC,
-  )
-  return {
-    instrument,
-    state,
-    lastPrice,
-    lastPriceAt: END_ISO,
-    sparkline: sparklineFromBars(bars),
-  }
+// TOPIX Mini: OSE, 0.25 index points / tick, ¥1000 / index point → ¥250 / tick.
+// Sits alongside Nikkei in the watchlist so the operator can spot
+// divergence (narrow-rally = top-heavy Nikkei without TOPIX follow-through).
+const TPXM_INSTRUMENT: Instrument = {
+  symbol: 'TPXM',
+  displayName: 'TOPIX Mini',
+  tickSize: 0.25,
+  tickValue: 250,
+  quoteCurrency: 'JPY',
+}
+const TPXM_BARS = generateBars(
+  4242,
+  BAR_COUNT,
+  2_810,
+  2_812.5,
+  1.5,
+  TPXM_INSTRUMENT.tickSize,
+  END_TIME_SEC,
+  BAR_STEP_SEC,
+)
+const TPXM_SETUP: SetupContext = {
+  setupName: 'VWAP reclaim',
+  side: 'short',
+  target: { price: 2_790, label: '+1.5R' },
+  retreat: { price: 2_825, label: 'invalidation' },
+  rMultiple: 0,
+  setupRange: null,
+}
+const TPXM_ROW: InstrumentRowState = {
+  instrument: TPXM_INSTRUMENT,
+  state: 'HOLD',
+  setup: TPXM_SETUP,
+  lastPrice: 2_812.5,
+  lastPriceAt: END_ISO,
+  macro: null,
+  bars: TPXM_BARS,
+  indicators: [
+    ...emaPair(TPXM_BARS),
+    { name: 'VWAP', kind: 'vwap', points: computeVwap(TPXM_BARS) },
+  ],
 }
 
-const WATCHLIST: WatchlistItem[] = [
-  generateWatchlistItem(
-    4242,
-    {
-      symbol: 'FUT-B',
-      displayName: 'Mock Future B',
-      tickSize: 0.5,
-      tickValue: 10,
-      quoteCurrency: 'USD',
-    },
-    'HOLD',
-    4_830,
-    4_829.75,
-    2.5,
-  ),
-  generateWatchlistItem(
-    9001,
-    {
-      symbol: 'FUT-C',
-      displayName: 'Mock Future C',
-      tickSize: 0.1,
-      tickValue: 10,
-      quoteCurrency: 'USD',
-    },
-    'RETREAT',
-    310.2,
-    308.4,
-    0.4,
-  ),
-  generateWatchlistItem(
-    1717,
-    {
-      symbol: 'FUT-D',
-      displayName: 'Mock Future D',
-      tickSize: 0.01,
-      tickValue: 1,
-      quoteCurrency: 'USD',
-    },
-    'EXIT',
-    42.6,
-    42.91,
-    0.08,
-  ),
+// USD/JPY spot: 0.001 / tick quote. The classic leading indicator for
+// Japan-equity direction — yen-weaker typically supports Nikkei. Having
+// it in the same watchlist as Nikkei mini is the concrete example ADR
+// 004 uses for "no single-asset-class constraint".
+const USDJPY_INSTRUMENT: Instrument = {
+  symbol: 'USDJPY',
+  displayName: 'USD/JPY',
+  tickSize: 0.001,
+  tickValue: 1,
+  quoteCurrency: 'JPY',
+}
+const USDJPY_BARS = generateBars(
+  9001,
+  BAR_COUNT,
+  155.4,
+  155.418,
+  0.04,
+  USDJPY_INSTRUMENT.tickSize,
+  END_TIME_SEC,
+  BAR_STEP_SEC,
+)
+const USDJPY_SETUP: SetupContext = {
+  setupName: 'Asian range break',
+  side: 'long',
+  target: { price: 155.65, label: '+2R' },
+  retreat: { price: 155.3, label: 'stop' },
+  rMultiple: 0.3,
+  setupRange: {
+    upper: { price: 155.45, label: 'AR high' },
+    lower: { price: 155.35, label: 'AR low' },
+    midline: { price: 155.4, label: 'AR mid' },
+  },
+}
+const USDJPY_ROW: InstrumentRowState = {
+  instrument: USDJPY_INSTRUMENT,
+  state: 'ENTER',
+  setup: USDJPY_SETUP,
+  lastPrice: 155.418,
+  lastPriceAt: END_ISO,
+  macro: null,
+  bars: USDJPY_BARS,
+  indicators: [
+    ...emaPair(USDJPY_BARS),
+    { name: 'VWAP', kind: 'vwap', points: computeVwap(USDJPY_BARS) },
+  ],
+}
+
+// S&P 500 E-mini: CME, 0.25 / tick, $12.50 / tick. Overnight-driver
+// context for a Japan-session Nikkei primary — weak ES pre-Tokyo tends
+// to drag the open. Different asset class (US index futures) but kept
+// in the same watchlist (ADR 004 cross-asset OK).
+const ES_INSTRUMENT: Instrument = {
+  symbol: 'ES',
+  displayName: 'S&P 500 E-mini',
+  tickSize: 0.25,
+  tickValue: 12.5,
+  quoteCurrency: 'USD',
+}
+const ES_BARS = generateBars(
+  1717,
+  BAR_COUNT,
+  5_710,
+  5_712.25,
+  1.2,
+  ES_INSTRUMENT.tickSize,
+  END_TIME_SEC,
+  BAR_STEP_SEC,
+)
+const ES_SETUP: SetupContext = {
+  setupName: 'Globex breakout',
+  side: 'long',
+  target: { price: 5_730.0, label: '+2R' },
+  retreat: { price: 5_703.0, label: 'stop' },
+  rMultiple: 0,
+  setupRange: null,
+}
+const ES_ROW: InstrumentRowState = {
+  instrument: ES_INSTRUMENT,
+  state: 'HOLD',
+  setup: ES_SETUP,
+  lastPrice: 5_712.25,
+  lastPriceAt: END_ISO,
+  macro: null,
+  bars: ES_BARS,
+  indicators: [
+    ...emaPair(ES_BARS),
+    { name: 'VWAP', kind: 'vwap', points: computeVwap(ES_BARS) },
+  ],
+}
+
+// --- Universe + common data + projection ------------------------------
+
+export const dashboardUniverse: InstrumentRowState[] = [
+  NKM_ROW,
+  TPXM_ROW,
+  USDJPY_ROW,
+  ES_ROW,
 ]
 
-// Hand-authored headlines — no real sources, no real instruments
-// (CLAUDE.md privacy rule). Offsets are relative to END_TIME_SEC so the
-// feed always reads as "recent" no matter when the module loads.
+// pctChange values plausible for a Tokyo morning with a yen-weakening
+// undertone: Nikkei and TOPIX up with USD/JPY up (yen weaker →
+// exporters bid), ES slightly red from overnight carry. These mirror
+// the "agreement check" the widget is designed for — the operator on
+// a Nikkei long sees two supporting signals and one warning.
+export const pctChangeOf: Record<string, number> = {
+  NKM: 0.42,
+  TPXM: 0.28,
+  USDJPY: 0.41,
+  ES: -0.15,
+}
+
+const RULE_STATE: RuleOverlayState = {
+  used: 930,
+  cap: 2000,
+  capReached: false,
+  cooldownActive: false,
+  cooldownUntil: null,
+  quoteCurrency: 'JPY',
+}
+
+const NEXT_MACRO: NextMacroEvent = {
+  eventName: 'US CPI release',
+  impactTier: 'high',
+  at: NEXT_EVENT_ISO,
+}
+
 const NEWS_ITEMS: NewsItem[] = [
+  // Hand-authored headlines that read like a wire feed, pinned to
+  // offsets from END_TIME_SEC so the list always looks recent. Fully
+  // fictional — no real sources, no operator-specific positioning.
   {
     id: 'news-1',
-    title: 'Mock wire: central bank officials signal cautious stance',
+    title: 'BOJ governor hints at cautious tightening in afternoon remarks',
     impactTier: 'high',
     at: new Date((END_TIME_SEC - 2 * 60) * 1000).toISOString(),
   },
   {
     id: 'news-2',
-    title: 'Mock wire: energy inventories print below consensus',
+    title: 'US crude stockpiles fall sharply, beating consensus',
     impactTier: 'medium',
     at: new Date((END_TIME_SEC - 14 * 60) * 1000).toISOString(),
   },
   {
     id: 'news-3',
-    title: 'Mock wire: equity futures trim gains into the open',
+    title: 'European equities open mixed ahead of ECB commentary',
     impactTier: 'low',
     at: new Date((END_TIME_SEC - 35 * 60) * 1000).toISOString(),
   },
   {
     id: 'news-4',
-    title: 'Mock wire: rate-path expectations edge higher',
+    title: 'US 10Y yields edge lower on softer economic data',
     impactTier: 'medium',
     at: new Date((END_TIME_SEC - 72 * 60) * 1000).toISOString(),
   },
 ]
 
-export const dashboardDefault: DashboardPayload = {
+export interface DashboardCommon {
+  sessionPhase: SessionPhase
+  nextMacroEvent: NextMacroEvent | null
+  intradayPnl: PnlPoint[]
+  rule: RuleOverlayState
+  news: NewsItem[]
+}
+
+export const dashboardCommon: DashboardCommon = {
   sessionPhase: 'open',
-  nextMacroEvent: {
-    eventName: 'Macro release A',
-    impactTier: 'high',
-    at: NEXT_EVENT_ISO,
-  },
+  nextMacroEvent: NEXT_MACRO,
   intradayPnl: intradayPnlCurve(),
-  rule: {
-    used: 930,
-    cap: 2000,
-    capReached: false,
-    cooldownActive: false,
-    cooldownUntil: null,
-    quoteCurrency: 'USD',
-  },
-  primary: {
-    instrument: {
-      symbol: 'FUT-A',
-      displayName: 'Mock Future A',
-      tickSize: 0.25,
-      tickValue: 5,
-      quoteCurrency: 'USD',
-    },
-    state: 'ENTER',
-    setup: {
-      setupName: 'Opening range break',
-      side: 'long',
-      target: { price: 17_620.5, label: '+2R' },
-      retreat: { price: 17_548.75, label: 'stop' },
-      rMultiple: 0.4,
-      setupRange: {
-        upper: { price: 17_595, label: 'ORH' },
-        lower: { price: 17_560, label: 'ORL' },
-        midline: { price: 17_577.5, label: 'OR mid' },
-      },
-    },
-    lastPrice: 17_582.25,
-    lastPriceAt: END_ISO,
-    macro: {
-      eventName: 'Macro release A',
-      impactTier: 'high',
-      phase: 'event',
-      startsAt: MACRO_START_ISO,
-      endsAt: MACRO_END_ISO,
-    },
-    bars: FUT_A_BARS,
-    indicators: [
-      ...emaPair(FUT_A_BARS),
-      { name: 'VWAP', kind: 'vwap', points: computeVwap(FUT_A_BARS) },
-    ],
-  },
-  watchlist: WATCHLIST,
+  rule: RULE_STATE,
   news: NEWS_ITEMS,
 }
+
+export const DEFAULT_PRIMARY_SYMBOL = 'NKM'
+
+function toWatchlistItem(
+  row: InstrumentRowState,
+  pctChange: number,
+): WatchlistItem {
+  return {
+    instrument: row.instrument,
+    state: row.state,
+    lastPrice: row.lastPrice,
+    lastPriceAt: row.lastPriceAt,
+    pctChange,
+    sparkline: sparklineFromBars(row.bars),
+  }
+}
+
+// Re-project the universe into a `DashboardPayload` with the requested
+// instrument as the heavy primary. Active primary is excluded from the
+// watchlist (ADR 004 contract). Defaults to `DEFAULT_PRIMARY_SYMBOL`
+// when the caller does not specify — handy for the initial page load
+// before the operator has swapped anything.
+export function projectDashboard(
+  primarySymbol: string = DEFAULT_PRIMARY_SYMBOL,
+  universe: InstrumentRowState[] = dashboardUniverse,
+  pctChanges: Record<string, number> = pctChangeOf,
+  common: DashboardCommon = dashboardCommon,
+): DashboardPayload {
+  const primary =
+    universe.find((row) => row.instrument.symbol === primarySymbol) ??
+    universe[0]
+  const watchlist = universe
+    .filter((row) => row.instrument.symbol !== primary.instrument.symbol)
+    .map((row) => toWatchlistItem(row, pctChanges[row.instrument.symbol] ?? 0))
+  return {
+    sessionPhase: common.sessionPhase,
+    nextMacroEvent: common.nextMacroEvent,
+    intradayPnl: common.intradayPnl,
+    rule: common.rule,
+    primary,
+    watchlist,
+    news: common.news,
+  }
+}
+
+export const dashboardDefault: DashboardPayload = projectDashboard()
 
 export const dashboardScenarios = {
   default: dashboardDefault,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { dashboardDefault, dashboardScenarios } from './dashboard'
+import {
+  DEFAULT_PRIMARY_SYMBOL,
+  dashboardDefault,
+  dashboardScenarios,
+  dashboardUniverse,
+  projectDashboard,
+} from './dashboard'
 
 const VALID_STATES = ['ENTER', 'HOLD', 'EXIT', 'RETREAT']
 const VALID_PHASES = ['pre_open', 'open', 'lunch', 'close', 'after_hours']
@@ -7,11 +13,19 @@ const VALID_IMPACTS = ['low', 'medium', 'high']
 
 describe('dashboard mocks', () => {
   it('default scenario has a primary instrument', () => {
-    // Phase 1 centers on a single primary (ADR 004). A missing primary
-    // would leave the dashboard's left column blank and mask regressions
-    // in PrimaryInstrumentPanel.
+    // ADR 004: primary is a view mode, not a fixed property. The mock
+    // picks whichever instrument `DEFAULT_PRIMARY_SYMBOL` names as the
+    // page-load focus; the universe holds all tracked instruments.
     expect(dashboardDefault.primary).toBeDefined()
-    expect(dashboardDefault.primary.instrument.symbol).toBeTruthy()
+    expect(dashboardDefault.primary.instrument.symbol).toBe(DEFAULT_PRIMARY_SYMBOL)
+  })
+
+  it('tracks multiple instruments in the universe', () => {
+    // Swap mechanics (ADR 004) require more than one tracked
+    // instrument to be meaningful — a one-item universe would leave
+    // the watchlist permanently empty and regressions in the swap
+    // handler would never surface.
+    expect(dashboardUniverse.length).toBeGreaterThanOrEqual(2)
   })
 
   it('primary state is one of the four ADR-004 recommendation values', () => {
@@ -79,21 +93,46 @@ describe('dashboard mocks', () => {
     }
   })
 
-  it('watchlist carries at least one secondary instrument', () => {
-    // The right-column widget (ADR 004 Dashboard layout) is meaningless
-    // empty. At least one entry keeps the widget's render path exercised
-    // against the default scenario.
-    expect(dashboardDefault.watchlist.length).toBeGreaterThanOrEqual(1)
+  it('watchlist contains every tracked instrument except the primary', () => {
+    // ADR 004 layout contract: the active primary is excluded from the
+    // watchlist (no duplication between the two surfaces). Every *other*
+    // universe member must appear exactly once.
+    const primarySymbol = dashboardDefault.primary.instrument.symbol
+    const expected = dashboardUniverse
+      .filter((row) => row.instrument.symbol !== primarySymbol)
+      .map((row) => row.instrument.symbol)
+      .sort()
+    const got = dashboardDefault.watchlist
+      .map((item) => item.instrument.symbol)
+      .sort()
+    expect(got).toEqual(expected)
   })
 
-  it('every watchlist item has a valid state and a non-empty sparkline', () => {
-    // Sparkline is the widget's visual hook — zero points would render a
-    // flat or invisible line and hide regressions in the mini-row
-    // component.
+  it('every watchlist item has a valid state, a non-empty sparkline, and a numeric pctChange', () => {
+    // Sparkline + pctChange are the widget's two glance-read signals
+    // (ADR 004 §Watchlist bullet). Zero points or non-numeric %change
+    // would render a broken mini row.
     for (const item of dashboardDefault.watchlist) {
       expect(VALID_STATES).toContain(item.state)
       expect(item.sparkline.length).toBeGreaterThan(0)
+      expect(typeof item.pctChange).toBe('number')
+      expect(Number.isFinite(item.pctChange)).toBe(true)
     }
+  })
+
+  it('projectDashboard with a different primarySymbol swaps the focus', () => {
+    // The swap mechanic (ADR 004 §Swap is a view-level action) must
+    // re-project the same universe: the requested symbol becomes
+    // primary, the old primary reappears in the watchlist, and no
+    // instrument is ever present in both surfaces at once.
+    const originalPrimary = dashboardDefault.primary.instrument.symbol
+    const alternate = dashboardDefault.watchlist[0].instrument.symbol
+    const projected = projectDashboard(alternate)
+
+    expect(projected.primary.instrument.symbol).toBe(alternate)
+    const watchlistSymbols = projected.watchlist.map((i) => i.instrument.symbol)
+    expect(watchlistSymbols).not.toContain(alternate)
+    expect(watchlistSymbols).toContain(originalPrimary)
   })
 
   it('news items carry a valid impact tier', () => {
