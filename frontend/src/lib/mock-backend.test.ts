@@ -73,12 +73,6 @@ function seed(rows: InstrumentRowState[] = [futARow()]): MockBackendSeed {
     pctChanges,
     defaultPrimary: universe[0].instrument.symbol,
     common: {
-      sessionPhase: 'open',
-      nextMacroEvent: null,
-      intradayPnl: [
-        { t: '09:00', pnl: 0 },
-        { t: '09:15', pnl: -50 },
-      ],
       rule: {
         used: 0,
         cap: 1000,
@@ -87,6 +81,7 @@ function seed(rows: InstrumentRowState[] = [futARow()]): MockBackendSeed {
         cooldownUntil: null,
         quoteCurrency: 'USD',
       },
+      markets: [],
       news: [],
     },
   }

@@ -6,11 +6,9 @@ import type {
   Instrument,
   InstrumentRowState,
   MacroEventWindow,
+  MarketIndex,
   NewsItem,
-  NextMacroEvent,
-  PnlPoint,
   RuleOverlayState,
-  SessionPhase,
   SetupContext,
   SparklinePoint,
   WatchlistItem,
@@ -174,7 +172,6 @@ const END_TIME_SEC = Math.floor(Date.now() / 1000)
 const BAR_COUNT = 120
 const BAR_STEP_SEC = 10
 const END_ISO = new Date(END_TIME_SEC * 1000).toISOString()
-const NEXT_EVENT_ISO = new Date((END_TIME_SEC + 3 * 60 * 60) * 1000).toISOString()
 
 // Active macro window centered on the current wall clock — half the
 // window sits in-frame, half just-before. Exists so the mock dashboard
@@ -187,23 +184,6 @@ const MACRO_START_ISO = new Date(
 const MACRO_END_ISO = new Date(
   (END_TIME_SEC + MACRO_WINDOW_HALF_SEC) * 1000,
 ).toISOString()
-
-function intradayPnlCurve(): PnlPoint[] {
-  // 15-min buckets across a ~6 h session. Values are hand-authored to
-  // produce a realistic drawdown-then-partial-recovery shape.
-  const buckets = [
-    0, 150, 320, 410, 280, 90, -120, -380, -620, -910, -1180, -1320, -1450,
-    -1510, -1420, -1360, -1240, -1180, -1100, -1080, -1120, -1060, -980,
-    -930,
-  ]
-  const start = 9 * 60
-  return buckets.map((pnl, i) => {
-    const mins = start + i * 15
-    const hh = String(Math.floor(mins / 60)).padStart(2, '0')
-    const mm = String(mins % 60).padStart(2, '0')
-    return { t: `${hh}:${mm}`, pnl }
-  })
-}
 
 // --- Per-instrument definitions ---------------------------------------
 
@@ -422,11 +402,45 @@ const RULE_STATE: RuleOverlayState = {
   quoteCurrency: 'JPY',
 }
 
-const NEXT_MACRO: NextMacroEvent = {
-  eventName: 'US CPI release',
-  impactTier: 'high',
-  at: NEXT_EVENT_ISO,
-}
+// Top-strip benchmark indices (ADR 004 Markets overview). Cash indices,
+// not tradeable — `MarketIndex` is structurally separate from
+// `Instrument`. Prices and pctChanges are hand-picked to be consistent
+// with the watchlist scene: NKM future aligns with N225 cash, ES
+// future aligns with SPX cash, USDJPY here matches the FX cross in the
+// watchlist. Small divergences between futures and cash mimic normal
+// basis drift rather than revealing a bug.
+const MARKET_INDICES: MarketIndex[] = [
+  {
+    ticker: 'N225',
+    displayName: 'Nikkei 225',
+    lastPrice: 38_580,
+    pctChange: 0.42,
+  },
+  {
+    ticker: 'DJIA',
+    displayName: 'Dow Jones',
+    lastPrice: 39_540,
+    pctChange: -0.08,
+  },
+  {
+    ticker: 'NDX',
+    displayName: 'Nasdaq 100',
+    lastPrice: 20_420,
+    pctChange: 0.18,
+  },
+  {
+    ticker: 'SPX',
+    displayName: 'S&P 500',
+    lastPrice: 5_715,
+    pctChange: -0.12,
+  },
+  {
+    ticker: 'USDJPY',
+    displayName: 'USD/JPY',
+    lastPrice: 155.42,
+    pctChange: 0.41,
+  },
+]
 
 const NEWS_ITEMS: NewsItem[] = [
   // Hand-authored headlines that read like a wire feed, pinned to
@@ -459,18 +473,14 @@ const NEWS_ITEMS: NewsItem[] = [
 ]
 
 export interface DashboardCommon {
-  sessionPhase: SessionPhase
-  nextMacroEvent: NextMacroEvent | null
-  intradayPnl: PnlPoint[]
   rule: RuleOverlayState
+  markets: MarketIndex[]
   news: NewsItem[]
 }
 
 export const dashboardCommon: DashboardCommon = {
-  sessionPhase: 'open',
-  nextMacroEvent: NEXT_MACRO,
-  intradayPnl: intradayPnlCurve(),
   rule: RULE_STATE,
+  markets: MARKET_INDICES,
   news: NEWS_ITEMS,
 }
 
@@ -508,10 +518,8 @@ export function projectDashboard(
     .filter((row) => row.instrument.symbol !== primary.instrument.symbol)
     .map((row) => toWatchlistItem(row, pctChanges[row.instrument.symbol] ?? 0))
   return {
-    sessionPhase: common.sessionPhase,
-    nextMacroEvent: common.nextMacroEvent,
-    intradayPnl: common.intradayPnl,
     rule: common.rule,
+    markets: common.markets,
     primary,
     watchlist,
     news: common.news,

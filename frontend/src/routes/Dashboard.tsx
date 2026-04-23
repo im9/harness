@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
+import MarketsStrip from '@/components/dashboard/MarketsStrip'
 import NewsFeed from '@/components/dashboard/NewsFeed'
 import PrimaryInstrumentPanel from '@/components/dashboard/PrimaryInstrumentPanel'
-import StatusStrip from '@/components/dashboard/StatusStrip'
 import Watchlist from '@/components/dashboard/Watchlist'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Timeframe } from '@/lib/dashboard-types'
@@ -57,11 +57,7 @@ export default function Dashboard() {
     // (without it, the default min-content behavior collapses the
     // container to the chart's intrinsic size).
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <StatusStrip
-        sessionPhase={data.sessionPhase}
-        intradayPnl={data.intradayPnl}
-        nextMacroEvent={data.nextMacroEvent}
-      />
+      <MarketsStrip markets={data.markets} />
       {error && (
         <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">
           Stream error: {error.message} — showing last known snapshot

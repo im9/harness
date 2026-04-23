@@ -3,7 +3,6 @@ import type {
   DashboardPayload,
   IndicatorLine,
   InstrumentRowState,
-  PnlPoint,
   Timeframe,
   WatchlistItem,
 } from './dashboard-types'
@@ -37,7 +36,6 @@ import type { DashboardCommon } from './mocks/dashboard'
 // without reshaping the payload contract inline.
 
 const BAR_COUNT = 120
-const PNL_STEP_MIN = 15
 const DEFAULT_TIMEFRAME: Timeframe = '10s'
 
 interface Series {
@@ -170,23 +168,6 @@ function advanceSeries(
   return { bars, indicators }
 }
 
-function extendPnl(pnl: PnlPoint[], nowSec: number, startSec: number): PnlPoint[] {
-  if (pnl.length === 0) return pnl
-  const result = [...pnl]
-  const rand = seededRandom(Math.floor(nowSec))
-  let lastBucketSec = startSec + (result.length - 1) * PNL_STEP_MIN * 60
-  let lastValue = result[result.length - 1].pnl
-  while (lastBucketSec + PNL_STEP_MIN * 60 <= nowSec) {
-    lastBucketSec += PNL_STEP_MIN * 60
-    lastValue = Math.round(lastValue + (rand() - 0.5) * 200)
-    const d = new Date(lastBucketSec * 1000)
-    const hh = String(d.getUTCHours()).padStart(2, '0')
-    const mm = String(d.getUTCMinutes()).padStart(2, '0')
-    result.push({ t: `${hh}:${mm}`, pnl: lastValue })
-  }
-  return result
-}
-
 export interface SnapshotOptions {
   nowSec?: number
   timeframes?: Record<string, Timeframe>
@@ -213,7 +194,6 @@ export class MockBackend {
   private pctChanges: Record<string, number>
   private defaultPrimary: string
   private common: DashboardCommon
-  private pnlStartSec: number
 
   constructor(seed: MockBackendSeed = defaultSeed) {
     const cloned: MockBackendSeed = {
@@ -258,9 +238,6 @@ export class MockBackend {
       }
       this.entries.set(row.instrument.symbol, { row, seriesBySymbol: seriesMap })
     }
-
-    this.pnlStartSec =
-      nowSec - (this.common.intradayPnl.length - 1) * PNL_STEP_MIN * 60
   }
 
   getSnapshot(options: SnapshotOptions = {}): DashboardPayload {
@@ -283,13 +260,6 @@ export class MockBackend {
         entry.seriesBySymbol.set(tf, advanced)
       }
     }
-
-    const intradayPnl = extendPnl(
-      this.common.intradayPnl,
-      wallNow,
-      this.pnlStartSec,
-    )
-    this.common = { ...this.common, intradayPnl }
 
     const primaryEntry = this.entries.get(primarySymbol)!
     const primaryTf = tfMap[primarySymbol] ?? DEFAULT_TIMEFRAME
@@ -329,10 +299,8 @@ export class MockBackend {
     }
 
     return structuredClone({
-      sessionPhase: this.common.sessionPhase,
-      nextMacroEvent: this.common.nextMacroEvent,
-      intradayPnl: this.common.intradayPnl,
       rule: this.common.rule,
+      markets: this.common.markets,
       news: this.common.news,
       primary,
       watchlist,

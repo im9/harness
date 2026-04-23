@@ -89,12 +89,12 @@ describe('App routing', () => {
 
     renderAt('/')
 
-    // The dashboard page exposes a "Session status" landmark as its top
-    // frame (ADR 004 StatusStrip). Matching on the landmark — rather than
-    // a piece of visible text — keeps this test stable across the layout
-    // work still to land in slices (b)–(d).
+    // The dashboard page exposes a "Markets" overview landmark as its
+    // top frame (ADR 004 MarketsStrip). Matching on the landmark —
+    // rather than a piece of visible text — keeps this test stable
+    // across UI reshapes.
     expect(
-      await screen.findByRole('region', { name: /session status/i }),
+      await screen.findByRole('region', { name: /markets/i }),
     ).toBeInTheDocument()
     // AppShell surfaces the signed-in user via an aria-labelled avatar.
     // Asserting that confirms the protected shell resolved auth before
@@ -120,7 +120,7 @@ describe('App routing', () => {
     // the dashboard. This catches regressions where either the form doesn't
     // submit, login doesn't update AuthContext, or the redirect is missing.
     await waitFor(() => {
-      expect(screen.getByRole('region', { name: /session status/i })).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: /markets/i })).toBeInTheDocument()
     })
   })
 
@@ -154,7 +154,7 @@ describe('App routing', () => {
       .mockResolvedValueOnce(jsonResponse(204)) // logout
 
     renderAt('/')
-    await screen.findByRole('region', { name: /session status/i })
+    await screen.findByRole('region', { name: /markets/i })
 
     await user.click(screen.getByRole('button', { name: /sign out/i }))
 
@@ -162,6 +162,6 @@ describe('App routing', () => {
     // Checking both sides avoids a false pass where logout tears down state
     // but the router forgets to navigate away.
     expect(await screen.findByRole('form', { name: /sign in/i })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: /session status/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /markets/i })).not.toBeInTheDocument()
   })
 })

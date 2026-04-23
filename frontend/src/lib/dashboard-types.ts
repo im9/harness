@@ -10,8 +10,6 @@ export type RecommendationState = 'ENTER' | 'HOLD' | 'EXIT' | 'RETREAT'
 
 export type Side = 'long' | 'short'
 
-export type SessionPhase = 'pre_open' | 'open' | 'lunch' | 'close' | 'after_hours'
-
 export type ImpactTier = 'low' | 'medium' | 'high'
 
 // Chart timeframes. Wire-friendly string literals so the frontend and
@@ -171,22 +169,24 @@ export interface NewsItem {
   at: string
 }
 
-export interface PnlPoint {
-  t: string
-  pnl: number
-}
-
-export interface NextMacroEvent {
-  eventName: string
-  impactTier: ImpactTier
-  at: string
+// Cash benchmark index rendered in the top Markets strip (ADR 004
+// top-strip Markets overview). Structurally distinct from
+// `Instrument` — no state, no setup, no bars, no swap: these are
+// reference-only readouts that the operator does not trade through
+// harness. Keeping them on a separate type prevents accidental
+// promotion into watchlist / primary surfaces.
+export interface MarketIndex {
+  ticker: string
+  displayName: string
+  lastPrice: number
+  pctChange: number
 }
 
 export interface DashboardPayload {
-  sessionPhase: SessionPhase
-  nextMacroEvent: NextMacroEvent | null
-  intradayPnl: PnlPoint[]
   rule: RuleOverlayState
+  // Top-strip markets overview (ADR 004). A small, fixed set of
+  // global benchmark indices for at-a-glance macro context.
+  markets: MarketIndex[]
   // The active primary instrument — the one the dashboard is currently
   // focused on (ADR 004: "primary is a view mode, not a fixed
   // property"). The engine tracks state for every operator-configured

@@ -43,15 +43,18 @@ describe('Dashboard route', () => {
     expect(banners).toHaveLength(1)
   })
 
-  it('exposes the session status strip as a labeled landmark', () => {
+  it('exposes the markets overview strip as a labeled landmark', () => {
     useDashboardMock.mockReturnValue({
       data: dashboardDefault,
       loading: false,
       error: null,
     })
     render(<Dashboard />)
+    // ADR 004 top-strip Markets overview: a read-only row of benchmark
+    // indices. Matching on the accessible region name keeps the test
+    // stable across visual changes to how each card renders.
     expect(
-      screen.getByRole('region', { name: /session status/i }),
+      screen.getByRole('region', { name: /markets/i }),
     ).toBeInTheDocument()
   })
 
@@ -113,7 +116,7 @@ describe('Dashboard route', () => {
     // needs to keep seeing the last known engine state and a small
     // badge explaining why it may be stale.
     expect(screen.getByRole('alert')).toHaveTextContent(/stream blip/i)
-    expect(screen.getByRole('region', { name: /session status/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /markets/i })).toBeInTheDocument()
   })
 
   it('renders an error-only view when the initial fetch fails with no data', () => {

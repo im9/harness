@@ -19,9 +19,6 @@ function makePayload(tag: string): DashboardPayload {
   // Minimal distinct payloads so consecutive emits are distinguishable
   // by a marker value (here: the instrument's displayName).
   return {
-    sessionPhase: 'open',
-    nextMacroEvent: null,
-    intradayPnl: [],
     rule: {
       used: 0,
       cap: 1,
@@ -30,6 +27,7 @@ function makePayload(tag: string): DashboardPayload {
       cooldownUntil: null,
       quoteCurrency: 'USD',
     },
+    markets: [],
     primary: {
       instrument: {
         symbol: 'FUT-A',

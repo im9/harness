@@ -8,7 +8,6 @@ import {
 } from './dashboard'
 
 const VALID_STATES = ['ENTER', 'HOLD', 'EXIT', 'RETREAT']
-const VALID_PHASES = ['pre_open', 'open', 'lunch', 'close', 'after_hours']
 const VALID_IMPACTS = ['low', 'medium', 'high']
 
 describe('dashboard mocks', () => {
@@ -32,8 +31,18 @@ describe('dashboard mocks', () => {
     expect(VALID_STATES).toContain(dashboardDefault.primary.state)
   })
 
-  it('session phase is one of the declared SessionPhase values', () => {
-    expect(VALID_PHASES).toContain(dashboardDefault.sessionPhase)
+  it('ships a non-empty markets overview', () => {
+    // The top-strip Markets overview (ADR 004) is the only macro
+    // context surface in Phase 1; an empty array would render a bare
+    // top strip with nothing to read, masking regressions in
+    // MarketsStrip.
+    expect(dashboardDefault.markets.length).toBeGreaterThan(0)
+    for (const index of dashboardDefault.markets) {
+      expect(index.ticker).toBeTruthy()
+      expect(index.displayName).toBeTruthy()
+      expect(Number.isFinite(index.lastPrice)).toBe(true)
+      expect(Number.isFinite(index.pctChange)).toBe(true)
+    }
   })
 
   it('rule state reports used ≤ cap when cap has not been reached', () => {

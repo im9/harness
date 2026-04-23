@@ -160,8 +160,8 @@ on the swap mechanics described below.
   setup state for the active primary, current recommendation and
   reason, watchlist snapshot (ticker + state + last price + pctChange
   per tracked instrument, active primary excluded to avoid
-  duplication), today's P&L and distance to cap, upcoming macro
-  events, recent news headlines.
+  duplication), markets snapshot (global benchmark indices with
+  last + pctChange), rule state (used / cap), recent news headlines.
 - Text in, text out. No tool use in Phase 1.
 - **UI**: a floating action button anchored to the dashboard's
   bottom-right corner. Click expands into a right-aligned slide-in
@@ -200,30 +200,28 @@ operator configures.
 Simultaneous multi-primary (two or more full charts side-by-side) is
 a genuinely different layout concern and stays in Future extensions.
 
-Top status strip (full width): today's P&L (Tremor `AreaChart`
-sparkline + the current number), session phase, next macro event +
-countdown.
+**Top strip — Markets overview.** The dashboard's top strip is a
+read-only row of global benchmark indices: Nikkei 225, Dow Jones,
+Nasdaq 100, S&P 500, USD/JPY. Each renders as a compact card of
+`ticker · last · pctChange` with sign-driven color; clicks are
+inert. These are cash indices, not tradeable by the operator —
+a distinct `MarketIndex` type (no `state`, no `setup`, no swap,
+no bars) keeps them structurally separate from `Instrument` so
+they cannot be promoted to primary or mixed into the watchlist.
 
-**Top strip pivot (planned, Phase 1).** The session-status strip as
-described above lands on the operator before the surrounding UI is
-built out enough to make those numbers legible — a standalone
-"-930" reads as opaque noise, not as trading state. The strip will
-therefore be replaced by a **Markets overview**: a read-only row of
-global benchmark indices (Nikkei 225, Dow Jones, Nasdaq 100, S&P
-500, USD/JPY) rendered as compact cards of `ticker · last ·
-pctChange`. These are cash indices, not tradeable by the operator
-— a distinct type `MarketIndex` (no `state`, no `setup`, no swap),
-kept separate from `Instrument` to prevent conflation. The
-`intradayPnl`, `sessionPhase`, and `nextMacroEvent` display
-surfaces are removed from Phase 1; the fields drop out of the
-payload and will return when the UI builds up enough context
-around them to give the values meaning. The macro vertical band on
-the chart (`InstrumentRowState.macro`) is unaffected — that window
-is per-instrument and independent of the top strip.
+Operator-state surfaces (intraday P&L, session phase, next macro
+event countdown) are deliberately absent from Phase 1. A solitary
+"-930" on the page reads as opaque noise before the surrounding
+UI — journaling, rule-state rationale, session ceremony — exists
+to give it meaning; the fields are dropped from the payload and
+will return once that context is in place. The per-instrument
+macro band on the chart (`InstrumentRowState.macro`) is
+unaffected — that window belongs to the primary's chart, not the
+top strip.
 
 ```
 ┌────────────────────────────────────────────┬─────────────────┐
-│ StatusStrip: P&L sparkline, phase, next macro event          │
+│ Markets: [N225] [DJIA] [NDX] [SPX] [USDJPY]  ticker·last·%chg │
 ├────────────────────────────────────────────┼─────────────────┤
 │ Nikkei 225 Mini            ● ENTER         │  Watchlist      │
 │ NKM · OSE                                  │  - click-to-    │
@@ -348,8 +346,9 @@ mock-first against the payload contract; backend follows.
       the real API last:
   - [x] (a) `lib/dashboard-types.ts` payload contract +
         `lib/mocks/dashboard.ts` scenarios + route shell composing
-        `StateBanner`, `RuleGauge` (Tremor `CategoryBar`), and
-        `StatusStrip` (Tremor `AreaChart`).
+        `StateBanner` and `RuleGauge` (Tremor `CategoryBar`). (The
+        original `StatusStrip` shipped here was replaced by
+        `MarketsStrip` — see the top-strip pivot below.)
   - [x] (b) `lightweight-charts` price and volume panes with
         annotations:
     - [x] Per-row timeframe switcher
@@ -366,7 +365,7 @@ mock-first against the payload contract; backend follows.
         layout-only stubs against this v1 shape. (Superseded below
         by schema v2 once the swap model supersedes the original
         single-primary framing.)
-  - [ ] (d) Schema v2 + realistic mocks. `WatchlistItem` drops the
+  - [x] (d) Schema v2 + realistic mocks. `WatchlistItem` drops the
         heavy per-instrument fields (bars / indicators / setup /
         macro) and gains `pctChange: number` plus a lighter
         `sparkline: SparklinePoint[]`; `state` is retained so every
@@ -377,6 +376,14 @@ mock-first against the payload contract; backend follows.
         the payload accordingly. Mock data: Nikkei 225 Mini as
         primary, TOPIX Mini / USD-JPY / S&P 500 E-mini as watchlist
         — realistic enough to read as a real operator session.
+  - [ ] (d.5) Top strip pivot to Markets overview. Delete the
+        operator-state `StatusStrip` (P&L + session phase + next
+        macro event) and replace with `MarketsStrip`: read-only row
+        of global benchmark indices (Nikkei 225, Dow Jones, Nasdaq
+        100, S&P 500, USD/JPY). New `MarketIndex` type (ticker +
+        displayName + last + pctChange), structurally distinct from
+        `Instrument`. Payload drops `intradayPnl`, `sessionPhase`,
+        `nextMacroEvent`; adds `markets: MarketIndex[]`.
   - [ ] (e) Swap mechanics. `Dashboard` owns a `primarySymbol`
         state, initialized from the first tracked instrument.
         Subscription re-opens when the symbol changes. The per-
