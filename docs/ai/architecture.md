@@ -43,6 +43,8 @@ harness/
 
 - [ADR 001](adr/archive/001-tech-stack.md) — Tech stack (FastAPI, React, SQLite, self-implemented auth, asdf + uv + pnpm)
 - [ADR 002](adr/002-containerization.md) — Dev native; deploy containerized; hosting target remains open
+- [ADR 003](adr/archive/003-ui-foundations.md) — UI foundations (shadcn/ui + Tailwind v4 + react-hook-form + zod, lightweight-charts, Tremor Raw, AppShell, dark mode default)
+- [ADR 004](adr/004-mvp-scope.md) — Day-trade decision dashboard (swap-based primary, markets overview strip, click-to-swap watchlist, setup + rule + macro overlays, user-initiated AI chat)
 
 ## Hard constraints
 

@@ -9,7 +9,7 @@ Harness helps curb impulsive trading by enforcing rule-based decision-making thr
 - Trading rule definition and signal notifications
 - Entry/exit logging and retrospective review
 - Technical indicator dashboard
-- Push notifications (pluggable: LINE, Slack, etc.)
+- Push notifications via pluggable messaging-app integrations
 
 ## Development
 
