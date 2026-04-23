@@ -376,14 +376,18 @@ mock-first against the payload contract; backend follows.
         the payload accordingly. Mock data: Nikkei 225 Mini as
         primary, TOPIX Mini / USD-JPY / S&P 500 E-mini as watchlist
         — realistic enough to read as a real operator session.
-  - [ ] (d.5) Top strip pivot to Markets overview. Delete the
+  - [x] (d.5) Top strip pivot to Markets overview. Deleted the
         operator-state `StatusStrip` (P&L + session phase + next
-        macro event) and replace with `MarketsStrip`: read-only row
-        of global benchmark indices (Nikkei 225, Dow Jones, Nasdaq
-        100, S&P 500, USD/JPY). New `MarketIndex` type (ticker +
-        displayName + last + pctChange), structurally distinct from
-        `Instrument`. Payload drops `intradayPnl`, `sessionPhase`,
-        `nextMacroEvent`; adds `markets: MarketIndex[]`.
+        macro event) and replaced with `MarketsStrip`: read-only
+        row of global benchmark indices (Nikkei 225, Dow Jones,
+        Nasdaq 100, S&P 500, USD/JPY). New `MarketIndex` type
+        (ticker + displayName + last + pctChange), structurally
+        distinct from `Instrument`. Payload drops `intradayPnl`,
+        `sessionPhase`, `nextMacroEvent`; adds
+        `markets: MarketIndex[]`. Pctchange formatted with
+        leading sign and sign-driven color; last-price decimals
+        derived heuristically (0 for index-level values, 2 for
+        10–1000, 3 for FX-range).
   - [x] (e) Swap mechanics. `Dashboard` owns a `primarySymbol`
         state (`undefined` on initial load hands the choice to the
         backend's seed default). `useDashboard({ primarySymbol })`
@@ -416,8 +420,14 @@ mock-first against the payload contract; backend follows.
         instance per row. Last-price formatting derives decimals
         from `instrument.tickSize` so the row value agrees with
         the chart's candle closes for the same symbol.
-  - [ ] (h) `NewsFeed` widget — streamed headline list (impact tag
-        + time + title). Read-only.
+  - [x] (h) `NewsFeed` widget — streamed headline list (impact tag
+        + relative time + title). Each row stacks the tag + time on
+        one line over the headline on a second so long titles wrap
+        without pushing the tag off-screen. `formatRelativeTime`
+        buckets into `now` / `Xm ago` / `Xh ago` / `Xh Ym ago` and
+        clamps future timestamps to `now` to survive clock skew.
+        Read-only; filter, source badges, sentiment, click-through
+        detail remain Future extensions.
   - [ ] (i) `AiChatFloat` — FAB bottom-right → right-aligned
         slide-in panel. SSE consumer; cross-link to chart markers
         when the AI references a chart element by time ("the sweep
