@@ -39,4 +39,31 @@ describe('dashboard mocks', () => {
     // just as a loose export.
     expect(dashboardScenarios.default).toBe(dashboardDefault)
   })
+
+  it('every row carries a non-empty bar history with consistent OHLC', () => {
+    // The dashboard chart (ADR 004 layout) needs bars to render. A zero-
+    // length bars array would leave the chart pane blank and hide
+    // regressions in the PriceChart pipeline. OHLC consistency
+    // (low ≤ open,close ≤ high) is the minimum shape a candle renderer
+    // assumes; a violation would produce visually broken wicks.
+    for (const row of dashboardDefault.rows) {
+      expect(row.bars.length).toBeGreaterThan(0)
+      for (const bar of row.bars) {
+        expect(bar.low).toBeLessThanOrEqual(bar.open)
+        expect(bar.low).toBeLessThanOrEqual(bar.close)
+        expect(bar.high).toBeGreaterThanOrEqual(bar.open)
+        expect(bar.high).toBeGreaterThanOrEqual(bar.close)
+      }
+    }
+  })
+
+  it("anchors each row's last bar close to the row's lastPrice", () => {
+    // The status banner shows lastPrice as the "current" quote; the
+    // chart's right edge must agree or the two widgets disagree at a
+    // glance. The mock pins the final close for this reason.
+    for (const row of dashboardDefault.rows) {
+      const last = row.bars[row.bars.length - 1]
+      expect(last.close).toBe(row.lastPrice)
+    }
+  })
 })

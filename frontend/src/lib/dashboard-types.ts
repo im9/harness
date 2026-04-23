@@ -52,6 +52,16 @@ export interface RuleOverlayState {
   quoteCurrency: string
 }
 
+export interface Bar {
+  // UTC seconds since epoch. lightweight-charts accepts this shape
+  // directly via its `UTCTimestamp` time type.
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+}
+
 export interface InstrumentRowState {
   instrument: Instrument
   state: RecommendationState
@@ -59,6 +69,7 @@ export interface InstrumentRowState {
   lastPrice: number
   lastPriceAt: string
   macro: MacroEventWindow | null
+  bars: Bar[]
 }
 
 export interface PnlPoint {

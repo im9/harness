@@ -1,4 +1,4 @@
-import type { DashboardPayload } from '../dashboard-types'
+import type { Bar, DashboardPayload } from '../dashboard-types'
 
 // Deterministic dashboard scenarios for the mock-first UI build (ADR 004
 // development providers strategy). Each scenario is a fully-formed
@@ -8,6 +8,64 @@ import type { DashboardPayload } from '../dashboard-types'
 // All symbols and setup names here are intentionally generic
 // placeholders — no references to real instruments or the operator's
 // tracked universe (CLAUDE.md privacy rule).
+
+function seededRandom(seed: number): () => number {
+  // Linear congruential generator (Numerical Recipes constants).
+  // Used for deterministic mock data only — never for anything that
+  // resembles real randomness.
+  let state = seed >>> 0
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0
+    return state / 0x100000000
+  }
+}
+
+function round(n: number, tickSize: number): number {
+  const ticks = Math.round(n / tickSize)
+  return Math.round(ticks * tickSize * 100) / 100
+}
+
+function generateBars(
+  seed: number,
+  count: number,
+  centerPrice: number,
+  lastPrice: number,
+  volatility: number,
+  tickSize: number,
+  endTimeSec: number,
+  stepSec: number,
+): Bar[] {
+  const rand = seededRandom(seed)
+  const bars: Bar[] = []
+  const startTime = endTimeSec - (count - 1) * stepSec
+  let price = centerPrice + (rand() - 0.5) * volatility * 2
+  for (let i = 0; i < count; i++) {
+    const open = price
+    const close = open + (rand() - 0.5) * volatility * 2
+    const high = Math.max(open, close) + rand() * volatility
+    const low = Math.min(open, close) - rand() * volatility
+    bars.push({
+      time: startTime + i * stepSec,
+      open: round(open, tickSize),
+      high: round(high, tickSize),
+      low: round(low, tickSize),
+      close: round(close, tickSize),
+    })
+    price = close
+  }
+  // Pin the last bar's close to lastPrice so the chart's right edge
+  // agrees with the row's numeric display. Extend high / low if
+  // necessary to keep the bar consistent.
+  const last = bars[bars.length - 1]
+  last.close = lastPrice
+  last.high = Math.max(last.high, lastPrice)
+  last.low = Math.min(last.low, lastPrice)
+  return bars
+}
+
+const END_TIME_SEC = Math.floor(new Date('2026-04-23T09:45:00Z').getTime() / 1000)
+const BAR_COUNT = 60
+const BAR_STEP_SEC = 60
 
 function intradayPnlCurve(): { t: string; pnl: number }[] {
   // 5-min buckets across a 6-hour session. Values are hand-authored to
@@ -62,6 +120,16 @@ export const dashboardDefault: DashboardPayload = {
       lastPrice: 17_582.25,
       lastPriceAt: '2026-04-23T09:45:00Z',
       macro: null,
+      bars: generateBars(
+        1337,
+        BAR_COUNT,
+        17_570,
+        17_582.25,
+        6,
+        0.25,
+        END_TIME_SEC,
+        BAR_STEP_SEC,
+      ),
     },
     {
       instrument: {
@@ -82,6 +150,16 @@ export const dashboardDefault: DashboardPayload = {
       lastPrice: 4_829.75,
       lastPriceAt: '2026-04-23T09:45:00Z',
       macro: null,
+      bars: generateBars(
+        4242,
+        BAR_COUNT,
+        4_830,
+        4_829.75,
+        2.5,
+        0.5,
+        END_TIME_SEC,
+        BAR_STEP_SEC,
+      ),
     },
   ],
 }

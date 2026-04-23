@@ -1,3 +1,4 @@
+import PriceChart from '@/components/dashboard/PriceChart'
 import RuleGauge from '@/components/dashboard/RuleGauge'
 import StateBanner from '@/components/dashboard/StateBanner'
 import StatusStrip from '@/components/dashboard/StatusStrip'
@@ -21,12 +22,7 @@ export default function Dashboard() {
             className="flex flex-col gap-3"
           >
             <StateBanner row={row} />
-            <div
-              aria-hidden="true"
-              className="border-border bg-muted/10 text-muted-foreground flex h-56 items-center justify-center rounded-md border border-dashed text-xs"
-            >
-              Price chart — lightweight-charts integration pending
-            </div>
+            <PriceChart row={row} />
             <RuleGauge rule={payload.rule} />
           </section>
         ))}
