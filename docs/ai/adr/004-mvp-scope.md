@@ -28,9 +28,9 @@ architecture only.
 - `/` — **Dashboard** (live engine output)
 - `/settings` — configuration
 
-The AI chat is a right-side drawer on the dashboard, not a route.
-Notifications are toasts + webhook push, not a screen. No other routes
-in Phase 1.
+The AI chat is a floating panel anchored to the dashboard's bottom
+right, invoked on demand and not a route of its own. Notifications
+are toasts + webhook push, not a screen. No other routes in Phase 1.
 
 ### Recommendation (4 states)
 
@@ -64,13 +64,20 @@ context.
 
 ### Provider abstractions (mock-first)
 
-Three narrow protocols, all swappable:
+Four narrow protocols, all swappable:
 
 ```
 MarketDataProvider    .subscribe / .latest_bar / .session_calendar
 EventCalendarProvider .upcoming
+NewsProvider          .stream
 ChatProvider          .stream
 ```
+
+`NewsProvider` is distinct from `EventCalendarProvider`: calendar
+items are known-in-advance scheduled releases consumed by the macro
+overlay; news is streamed headlines rendered in the dashboard's
+sidebar widget. In Phase 1 news does not affect engine state — it is
+context for the operator and, via the auto-inject, for the AI chat.
 
 **Phase 1 ships mocks only.** Real-vendor adapters live outside the
 public tree (separate package, private sibling repo, or gitignored
@@ -82,6 +89,7 @@ Mock modes:
 |---|---|
 | `MarketDataProvider` | `synthesized` (random walk), `replay` (neutral CSV / Parquet), `scenario` (hand-authored sequences) |
 | `EventCalendarProvider` | `yaml` (operator override file) |
+| `NewsProvider` | `seeded` (hand-authored headlines with timing + impact tags) |
 | `ChatProvider` | `echo` (deterministic), `local` (self-hosted LLM) |
 
 No test, fixture, or example may reference a real adapter by name
@@ -92,7 +100,8 @@ No test, fixture, or example may reference a real adapter by name
 - **Persisted**: configuration only, in SQLite (instruments, sessions,
   rule parameters, setup params, provider selection, notifications).
 - **Not persisted**: ticks, bars, recommendations, rule-state
-  transitions, AI chat, P&L. All in-memory, reset at restart.
+  transitions, AI chat, news headlines, P&L. All in-memory, reset at
+  restart.
 
 Journaling is deferred. Without persistence of recommendation / rule
 logs, harness has no history surface in Phase 1 — no review screen, no
@@ -115,14 +124,14 @@ R distribution, rule effectiveness) justify the schema work.
 One panel per concern, persisted on save, validated via shared
 Pydantic schemas:
 
-Instruments · Sessions · Rule overlay · Setup library · Macro overlay
-· Market-data provider · Event-calendar provider · AI chat provider ·
-Notifications.
+Instruments (primary + watchlist) · Sessions · Rule overlay · Setup
+library · Macro overlay · Market-data provider · Event-calendar
+provider · News provider · AI chat provider · Notifications.
 
 Provider panels expose a "test connection" button. A failing test does
 not block save — the panel is marked "unverified".
 
-### AI chat (drawer, user-initiated)
+### AI chat (floating, user-initiated)
 
 - Never pushes proactively — responds only to operator-submitted
   messages.
@@ -130,51 +139,93 @@ not block save — the panel is marked "unverified".
   is computed upstream of the chat request and has no writable channel
   back).
 - Session-only; no persistence.
-- Auto-injected per turn (prompt-cached): current price / VWAP / setup
-  state per instrument, current recommendation and reason, today's
-  P&L and distance to cap, upcoming macro events.
+- Auto-injected per turn (prompt-cached): current price / VWAP /
+  setup state for the primary instrument, current recommendation and
+  reason, watchlist snapshot (symbols + state badges + last prices),
+  today's P&L and distance to cap, upcoming macro events, recent news
+  headlines.
 - Text in, text out. No tool use in Phase 1.
+- **UI**: a floating action button anchored to the dashboard's
+  bottom-right corner. Click expands into a right-aligned slide-in
+  panel (~400–500 px wide). The dashboard stays fully visible under
+  the panel (no dim overlay) so the operator can keep reading the
+  chart while composing a question about it; close returns the
+  dashboard to its uninterrupted view. Mobile collapses the panel to
+  full screen.
 
 ### Dashboard layout
 
-Chart-centric, one row per tracked instrument, vertically stacked.
-Each row:
+Phase 1 centers on a **single primary instrument**
+(operator-configured via `/settings`, Nikkei futures as the bootstrap
+target). The route's real estate splits ~70 / 30 between a
+primary-instrument panel on the left and a right-side context column.
+Multi-primary layouts are deliberately out of scope for Phase 1 —
+different asset classes (stocks, FX) are expected to grow their own
+page shapes and will live in successor ADRs rather than being
+retrofitted here.
+
+Top status strip (full width): today's P&L (Tremor `AreaChart`
+sparkline + the current number), session phase, next macro event +
+countdown.
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│ State banner (color-coded, setup name, side, R target)     │
-├────────────────────────────────────────────────────────────┤
-│              Price chart (candles)                         │
-│   - VWAP dashed line                                       │
-│   - Setup range / levels as shaded regions and lines       │
-│   - Target / retreat price lines with labels               │
-│   - Setup trigger markers on originating bars              │
-│   - Macro event vertical band when active                  │
-├────────────────────────────────────────────────────────────┤
-│              Volume pane                                   │
-├────────────────────────────────────────────────────────────┤
-│ Rule gauge: [████░░░░░░░░] used / cap (color by proximity) │
-└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────┬─────────────────┐
+│ StatusStrip: P&L sparkline, phase, next macro event          │
+├────────────────────────────────────────────┼─────────────────┤
+│ State banner (setup name, side, R target)  │  Watchlist      │
+├────────────────────────────────────────────┤  widget         │
+│                                            │  - mini row     │
+│  Price chart (candles)                     │    per secondary│
+│   - VWAP dashed line                       │    instrument:  │
+│   - Setup range / levels shaded            │    state badge, │
+│   - Target / retreat price lines           │    last price,  │
+│   - Setup trigger markers                  │    sparkline    │
+│   - Macro event vertical band              │                 │
+├────────────────────────────────────────────┼─────────────────┤
+│  Volume pane                               │  News widget    │
+├────────────────────────────────────────────┤  - headline     │
+│  Rule gauge: used / cap                    │    list:        │
+│                                            │    impact tag + │
+│                                            │    time + title │
+└────────────────────────────────────────────┴─────────────────┘
+                                                       [AI] FAB
 ```
 
-Top status strip: today's P&L (Tremor `AreaChart` sparkline + the
-current number), session phase, next macro event + countdown.
+Component boundaries (Phase 1 frontend):
 
-Right-side AI chat drawer (shadcn `Sheet`). When an AI message
-references a chart element by time ("the sweep at 14:23"), the
-corresponding marker pulses briefly (cross-link).
+- `PrimaryInstrumentPanel` — state banner + price chart (with all
+  annotations) + volume pane + rule gauge bundled as a single
+  decision unit. One per page.
+- `Watchlist` widget — N secondary instruments as a vertical list of
+  mini rows (state badge + last price + sparkline). Context, not
+  decision units: no full chart, no per-row timeframe switcher.
+  Operator-configured from the DB.
+- `NewsFeed` widget — streamed headline list (impact tag + time +
+  title). Read-only in Phase 1 — filter, source badges, sentiment,
+  click-through detail are Future extensions.
+- `AiChatFloat` — floating action button anchored bottom-right;
+  expands into a right-aligned slide-in panel as described in the AI
+  chat section.
 
-`ENTER` and `RETREAT` transitions animate the banner; they also fire a
-browser Notification and the configured webhook. No motion during
-steady state — only state-change moments are kinetic.
+Right-column widgets stack vertically (Watchlist above NewsFeed).
+Widget order is fixed in Phase 1; reorder / hide is a Future
+extension.
 
-Charting primitives: **`lightweight-charts`** for candles, price
-lines, markers, and sub-panes (price and volume). **Tremor Raw** for
-`CategoryBar` (rule gauge) and `AreaChart` (status-strip sparkline).
+Charting primitives: **`lightweight-charts`** for the primary
+instrument's candles, price lines, markers, and sub-panes (price and
+volume). **Tremor Raw** for `CategoryBar` (rule gauge) and
+`AreaChart` (status-strip sparkline, watchlist sparklines).
 
-Mobile: single-column stack, chat in a bottom sheet. Banner and rule
-gauge keep vertical priority so a glance from a locked phone reads
-the same story.
+`ENTER` and `RETREAT` transitions on the primary instrument animate
+the state banner and fire a browser Notification and the configured
+webhook. Watchlist state changes get a softer cue (badge color shift
+only; no banner animation, no webhook) so the primary panel stays
+the site of attention. No motion during steady state.
+
+Mobile: single column — primary panel first, watchlist and news
+widgets stacked below. Chat FAB anchors bottom-right and expands to
+full screen. Banner and rule gauge keep vertical priority so a
+glance from a locked phone reads the same story.
 
 ## What Phase 1 does NOT include
 
@@ -182,6 +233,8 @@ the same story.
 - Automated order placement (permanent, ADR 001)
 - Backtest UI (logic is backtestable offline; no UI module in Phase 1)
 - Multi-asset-class portfolio view
+- Multi-primary dashboard (two+ full charts side-by-side) — defer to a
+  successor ADR when a second asset class warrants its own page
 - History / review / archive screens (no persistence → no surface)
 
 ## Implementation
@@ -197,21 +250,24 @@ mock-first against the payload contract; backend follows.
 - [ ] Backend: `MarketDataProvider` + registry + mock (synthesized /
       replay / scenario) + in-memory tick / bar ring buffer
 - [ ] Backend: `EventCalendarProvider` + registry + mock (YAML)
+- [ ] Backend: `NewsProvider` + registry + mock (seeded) + SSE
 - [ ] Backend: `ChatProvider` + registry + mock (echo / local) + SSE
 - [ ] Backend: `SetupEngine` — starter setups as tick-driven pure
       state machines
 - [ ] Backend: `RuleOverlay` (cap, cooldown, overrides)
 - [ ] Backend: `MacroOverlay` (event-window effects)
 - [ ] Backend: `GET /api/dashboard` + `WebSocket /ws/dashboard`
+      (primary + watchlist + news + engine outputs in a single
+      payload)
 - [ ] Frontend (on ADR 003 scaffold): `/settings` — schema-driven
       forms per section, test-connection feedback, persist on save
-- [ ] Frontend: `/` dashboard — built mock-first against a frozen
-      payload contract, wired to the real API last:
+- [ ] Frontend: `/` dashboard — single primary + right-column
+      widgets, mock-first against a frozen payload contract, wired to
+      the real API last:
   - [x] (a) `lib/dashboard-types.ts` payload contract +
         `lib/mocks/dashboard.ts` scenarios + route shell composing
         `StateBanner`, `RuleGauge` (Tremor `CategoryBar`), and
-        `StatusStrip` (Tremor `AreaChart`). Chart slot is a
-        placeholder pending (b).
+        `StatusStrip` (Tremor `AreaChart`).
   - [x] (b) `lightweight-charts` price and volume panes with
         annotations:
     - [x] Per-row timeframe switcher
@@ -221,10 +277,23 @@ mock-first against the payload contract; backend follows.
     - [x] Macro event vertical band
     - [x] Setup range shading
     - [x] Volume pane
+  - [ ] (c) Layout reshape: `PrimaryInstrumentPanel` (left) +
+        right-side widget column. Payload contract replaces
+        `rows: InstrumentRowState[]` with `primary: InstrumentRowState`,
+        `watchlist: WatchlistItem[]` (lighter shape — state badge,
+        last price, sparkline points), and `news: NewsItem[]`.
+  - [ ] (d) `Watchlist` widget — mini row per secondary instrument
+        (state badge + last price + sparkline). No full chart; reuses
+        a lightweight sparkline primitive rather than instantiating a
+        second `lightweight-charts` chart per row.
+  - [ ] (e) `NewsFeed` widget — streamed headline list (impact tag +
+        time + title). Read-only.
+  - [ ] (f) `AiChatFloat` — FAB bottom-right → right-aligned slide-in
+        panel. SSE consumer; cross-link to chart markers when the AI
+        references a chart element by time ("the sweep at 14:23"
+        pulses the corresponding marker).
   - [ ] Wire to the real `GET /api/dashboard` /
         `WebSocket /ws/dashboard` payload.
-- [ ] Frontend: AI chat drawer (SSE consumer, cross-link to chart
-      markers)
 - [ ] CLI: `harness config import / export <yaml>`
 - [ ] E2E on mocks: scenario-driven session exercises the full
       pipeline (tick → engine → recommendation → UI → chat context)
@@ -285,3 +354,16 @@ buy") as cheap insurance on top of the private-access model.
   entries with a fill directive), per-indicator configuration, and
   chart rendering (two `LineSeries` + a custom primitive or
   area-series fill).
+- **Multi-primary dashboard** — two instruments side-by-side, or a
+  grid of primaries. Likely tied to asset-class-specific pages
+  (stock dashboard ≠ futures dashboard); a successor ADR per asset
+  class is more natural than retrofitting the Phase 1 single-primary
+  shell.
+- **News feed expansion** — filter bar, source badges, sentiment
+  tag, click-through detail panel. A natural continuation of the
+  Phase 1 read-only list once operator feedback shapes which
+  dimensions actually matter.
+- **Widget customization** — reorder, hide, or add right-column
+  widgets (e.g. correlation matrix, open interest, put-call ratio).
+  Phase 1 fixes the order at Watchlist → NewsFeed; a later iteration
+  might expose the layout in `/settings`.
