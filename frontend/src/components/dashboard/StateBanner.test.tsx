@@ -8,6 +8,7 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
     instrument: {
       symbol: 'FUT-A',
       displayName: 'Mock Future A',
+      venue: 'MOCK',
       tickSize: 0.25,
       tickValue: 5,
       quoteCurrency: 'USD',
@@ -39,6 +40,30 @@ describe('StateBanner', () => {
     // notification".
     const status = screen.getByRole('status')
     expect(status).toHaveTextContent(/ENTER/i)
+  })
+
+  it('exposes the display name as the hero-level heading', () => {
+    render(<StateBanner row={row({ state: 'ENTER' })} />)
+    // ADR 004 §State banner hierarchy: the hero line is the single
+    // source of "what am I looking at" now that the active primary
+    // is excluded from the watchlist. Promoting the display name to
+    // a role=heading level=1 lets screen readers announce it as the
+    // page's primary subject and keeps the visual hierarchy honest
+    // against the rest of the dashboard typography.
+    expect(
+      screen.getByRole('heading', { level: 1, name: /mock future a/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('renders ticker and venue as the sub-line', () => {
+    render(<StateBanner row={row({ state: 'HOLD' })} />)
+    // Sub-line disambiguates *which* market the instrument trades on.
+    // Matters when the watchlist mixes asset classes across venues
+    // (an "NKM" on OSE vs a ticker on another venue should never be
+    // ambiguous). The test matches the combined "FUT-A · MOCK" glyph
+    // rather than pulling them individually so the separator — the
+    // sub-line's only visible divider — is asserted at the same time.
+    expect(screen.getByText(/FUT-A\s*·\s*MOCK/)).toBeInTheDocument()
   })
 
   it('surfaces the setup name and side when a setup is active', () => {

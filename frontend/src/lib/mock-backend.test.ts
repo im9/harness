@@ -13,6 +13,7 @@ function futARow(): InstrumentRowState {
     instrument: {
       symbol: 'FUT-A',
       displayName: 'Mock Future A',
+      venue: 'MOCK',
       tickSize: 0.25,
       tickValue: 5,
       quoteCurrency: 'USD',
@@ -47,6 +48,7 @@ function futBRow(): InstrumentRowState {
     instrument: {
       symbol: 'FUT-B',
       displayName: 'Mock Future B',
+      venue: 'MOCK',
       tickSize: 0.5,
       tickValue: 10,
       quoteCurrency: 'USD',

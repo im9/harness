@@ -32,6 +32,7 @@ function makePayload(tag: string): DashboardPayload {
       instrument: {
         symbol: 'FUT-A',
         displayName: tag,
+        venue: 'MOCK',
         tickSize: 0.25,
         tickValue: 5,
         quoteCurrency: 'USD',

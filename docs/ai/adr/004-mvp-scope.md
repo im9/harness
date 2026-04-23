@@ -392,10 +392,16 @@ mock-first against the payload contract; backend follows.
         `PriceChart` fits content on symbol change (pan / zoom are
         reset since the price range is unrelated). Banner mount
         animation runs naturally on swap — no special suppression.
-  - [ ] (f) State banner redesign (three-tier hero / sub / meta as
+  - [x] (f) State banner redesign (three-tier hero / sub / meta as
         described in "State banner hierarchy"). Hero instrument
-        name is the largest text on the page; setup parameters
-        relegate to a de-emphasized meta strip.
+        name is an `<h1>` and the largest text on the page; ticker
+        and venue form the muted sub-line; setup parameters
+        (setupName / side / target / retreat) relegate to a
+        de-emphasized meta strip. State is communicated via a
+        right-aligned pill badge with a colored dot, so the outer
+        banner tone stays subtle (RETREAT gets a slightly louder
+        treatment for "close now" salience). Required adding
+        `Instrument.venue: string` to the payload contract.
   - [ ] (g) `Watchlist` widget — mini row per non-primary tracked
         instrument. Row shows ticker · display name · state dot ·
         pctChange · sparkline · last price. Row is a button — click

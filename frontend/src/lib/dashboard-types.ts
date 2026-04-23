@@ -42,6 +42,12 @@ export const TIMEFRAME_SEC: Record<Timeframe, number> = {
 export interface Instrument {
   symbol: string
   displayName: string
+  // Trading venue / exchange where the instrument is listed (OSE,
+  // CME, TSE, OTC, ...). Printed in the state banner's sub-line
+  // alongside the ticker so the operator sees the full identity of
+  // the focused instrument at a glance — particularly relevant when
+  // the watchlist mixes asset classes across venues.
+  venue: string
   tickSize: number
   tickValue: number
   quoteCurrency: string

@@ -193,6 +193,7 @@ const MACRO_END_ISO = new Date(
 const NKM_INSTRUMENT: Instrument = {
   symbol: 'NKM',
   displayName: 'Nikkei 225 Mini',
+  venue: 'OSE',
   tickSize: 5,
   tickValue: 500,
   quoteCurrency: 'JPY',
@@ -246,6 +247,7 @@ const NKM_ROW: InstrumentRowState = {
 const TPXM_INSTRUMENT: Instrument = {
   symbol: 'TPXM',
   displayName: 'TOPIX Mini',
+  venue: 'OSE',
   tickSize: 0.25,
   tickValue: 250,
   quoteCurrency: 'JPY',
@@ -289,6 +291,7 @@ const TPXM_ROW: InstrumentRowState = {
 const USDJPY_INSTRUMENT: Instrument = {
   symbol: 'USDJPY',
   displayName: 'USD/JPY',
+  venue: 'OTC',
   tickSize: 0.001,
   tickValue: 1,
   quoteCurrency: 'JPY',
@@ -336,6 +339,7 @@ const USDJPY_ROW: InstrumentRowState = {
 const ES_INSTRUMENT: Instrument = {
   symbol: 'ES',
   displayName: 'S&P 500 E-mini',
+  venue: 'CME',
   tickSize: 0.25,
   tickValue: 12.5,
   quoteCurrency: 'USD',

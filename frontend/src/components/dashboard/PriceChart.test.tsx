@@ -62,6 +62,7 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
     instrument: {
       symbol: 'FUT-A',
       displayName: 'Mock Future A',
+      venue: 'MOCK',
       tickSize: 0.25,
       tickValue: 5,
       quoteCurrency: 'USD',
