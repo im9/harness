@@ -10,7 +10,8 @@ import {
 import { flushSync } from 'react-dom'
 import {
   makeUserTurn,
-  sendChatMessage,
+  streamChatReply,
+  type ChatContext,
   type ChatTurn,
 } from '@/lib/chat-client'
 import { cn } from '@/lib/utils'
@@ -21,11 +22,27 @@ import { cn } from '@/lib/utils'
 // composing a question about it. Closing returns the dashboard to its
 // uninterrupted view. Mobile collapses the panel to full screen.
 //
-// Phase 1 is text in / text out against the `echo` mock ChatProvider.
-// Streaming (SSE), auto-injected context, and the chart-marker
-// cross-link arrive in subsequent increments ((i.2) / (i.3)).
+// Phase 1 streams text in / text out against the `echo` mock
+// ChatProvider (i.2). Each turn auto-injects the current dashboard
+// snapshot (primary / watchlist / markets / rule / news) per
+// ADR 004 §AI chat — the chart-marker cross-link arrives in (i.3).
 
-export default function AiChatFloat() {
+interface AiChatFloatProps {
+  // Live snapshot from the dashboard. Read on every submit (via a
+  // ref) so the model sees whatever the dashboard is showing in that
+  // frame, not the value at panel-open time.
+  context?: ChatContext | null
+}
+
+const EMPTY_CONTEXT: ChatContext = {
+  primary: null,
+  watchlist: [],
+  markets: [],
+  rule: null,
+  news: [],
+}
+
+export default function AiChatFloat({ context = null }: AiChatFloatProps = {}) {
   const [open, setOpen] = useState(false)
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [draft, setDraft] = useState('')
@@ -36,6 +53,15 @@ export default function AiChatFloat() {
   const fabRef = useRef<HTMLButtonElement | null>(null)
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
   const transcriptRef = useRef<HTMLDivElement | null>(null)
+
+  // Live ref to the latest context so submit reads the current
+  // snapshot without re-creating the callback on every dashboard tick
+  // (the parent may re-render at SSE cadence, which is too often to
+  // burn down the submit handler).
+  const contextRef = useRef<ChatContext | null>(context)
+  useEffect(() => {
+    contextRef.current = context
+  }, [context])
 
   const close = useCallback(() => {
     setOpen(false)
@@ -104,9 +130,34 @@ export default function AiChatFloat() {
       if (composerRef.current) {
         composerRef.current.value = ''
       }
+      const ctx = contextRef.current ?? EMPTY_CONTEXT
       try {
-        const reply = await sendChatMessage(text)
-        setTurns((prev) => [...prev, reply])
+        // Each chunk grows the same assistant bubble (id captured from
+        // the first chunk). The terminator chunk's `done` flag is what
+        // ends the stream, but the for-await loop also ends naturally
+        // when the generator returns — both paths land in the finally.
+        let assistantId: string | null = null
+        for await (const chunk of streamChatReply(text, ctx)) {
+          if (assistantId === null) {
+            assistantId = chunk.id
+            const initialTurn: ChatTurn = {
+              id: chunk.id,
+              role: 'assistant',
+              text: chunk.delta,
+              at: chunk.at,
+            }
+            setTurns((prev) => [...prev, initialTurn])
+          } else {
+            const id = assistantId
+            const delta = chunk.delta
+            const at = chunk.at
+            setTurns((prev) =>
+              prev.map((t) =>
+                t.id === id ? { ...t, text: t.text + delta, at } : t,
+              ),
+            )
+          }
+        }
       } finally {
         setPending(false)
       }
@@ -214,7 +265,12 @@ export default function AiChatFloat() {
           {turns.map((turn) => (
             <TurnBubble key={turn.id} turn={turn} />
           ))}
-          {pending && (
+          {pending && turns[turns.length - 1]?.role !== 'assistant' && (
+            // The "thinking" indicator only shows while we're waiting
+            // for the first chunk of the reply. Once a chunk lands the
+            // assistant bubble becomes the latest turn and the growing
+            // text itself communicates "responding" — a parallel "…"
+            // would read as a duplicate cue.
             <p
               className="text-muted-foreground text-xs italic"
               data-testid="pending-indicator"

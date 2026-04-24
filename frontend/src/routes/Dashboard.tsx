@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import AiChatFloat from '@/components/dashboard/AiChatFloat'
 import MarketsStrip from '@/components/dashboard/MarketsStrip'
 import NewsFeed from '@/components/dashboard/NewsFeed'
 import PrimaryInstrumentPanel from '@/components/dashboard/PrimaryInstrumentPanel'
 import Watchlist from '@/components/dashboard/Watchlist'
 import { Skeleton } from '@/components/ui/skeleton'
+import type { ChatContext } from '@/lib/chat-client'
 import type { Timeframe } from '@/lib/dashboard-types'
 import { useDashboard } from '@/lib/use-dashboard'
 
@@ -36,6 +37,23 @@ export default function Dashboard() {
   const handleSwapPrimary = useCallback((symbol: string) => {
     setPrimarySymbol(symbol)
   }, [])
+
+  // Per-turn snapshot for the AI chat (ADR 004 §AI chat: auto-injected
+  // primary / watchlist / markets / rule / news). Memoized on the
+  // payload identity so the chat panel only sees a fresh reference
+  // when the dashboard data actually changes — submit reads it via a
+  // ref, but re-projecting on every render would still churn React
+  // diffing inside the panel for no reason.
+  const chatContext = useMemo<ChatContext | null>(() => {
+    if (!data) return null
+    return {
+      primary: data.primary,
+      watchlist: data.watchlist,
+      markets: data.markets,
+      rule: data.rule,
+      news: data.news,
+    }
+  }, [data])
 
   if (loading) {
     return (
@@ -98,7 +116,7 @@ export default function Dashboard() {
           <NewsFeed items={data.news} />
         </div>
       </div>
-      <AiChatFloat />
+      <AiChatFloat context={chatContext} />
     </div>
   )
 }

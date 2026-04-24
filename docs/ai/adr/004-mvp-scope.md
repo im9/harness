@@ -452,12 +452,35 @@ mock-first against the payload contract; backend follows.
         border-radius uses an explicit 24px (half the 48px side) so
         the morph interpolates linearly to the open state's 8px
         without clamping to a pill shape mid-transition.
-  - [ ] (i.2) Streaming via SSE + auto-injected context. Replace
-        the echo provider with an SSE consumer that streams the
-        assistant reply in chunks; auto-inject the current `primary`
-        / `watchlist` / `markets` / `rule` / recent `news` snapshot
-        per turn (prompt-cached on the server side) as described in
-        the AI chat section.
+  - [x] (i.2) Streaming + auto-injected context. `chat-client.ts`
+        replaces the single-shot `sendChatMessage` with
+        `streamChatReply(text, context): AsyncGenerator<ChatStreamChunk>`,
+        which yields word-level chunks so the surface rehearses the
+        SSE shape the real provider will use. Two timing constants
+        separate the latencies a real LLM exposes:
+        `FIRST_CHUNK_DELAY_MS` (~350ms) rehearses the time-to-first-
+        token gap (model warm-up + initial inference), while
+        `STREAM_CHUNK_DELAY_MS` (~40ms ≈ 25 tok/s) is the per-token
+        cadence after the first chunk lands. Without that split the
+        entire reply finishes in one frame and the "thinking" UI
+        affordance is invisible. Each chunk carries a stable `id`
+        (one per reply, distinct across replies) plus a `done`
+        terminator flag and a unix-second `at` stamp; consumers
+        collapse chunks into a single growing bubble keyed by id.
+        A new `ChatContext` type at the chat boundary
+        (`primary | watchlist | markets | rule | news`, with
+        `primary`/`rule` nullable for the loading frame) is projected
+        from the dashboard payload and threaded through
+        `<AiChatFloat context={…} />`; the panel reads it via a ref
+        at submit time so each turn ships the latest snapshot rather
+        than the value at panel-open. The pending indicator is gated
+        on `pending && turns.at(-1)?.role !== 'assistant'` so it only
+        surfaces while waiting for the first chunk — once a chunk
+        lands the growing bubble itself is the streaming cue, and a
+        parallel "…" would read as a duplicate signal. The mock
+        echoes the prompt and ignores the snapshot body — the type
+        contract is the load-bearing surface for the real provider,
+        which prompt-caches the snapshot server-side.
   - [ ] (i.3) Chart-marker cross-link. Detect time references in
         assistant replies (e.g. `14:23`) and, on click of the
         reference, pulse the corresponding marker on the primary
