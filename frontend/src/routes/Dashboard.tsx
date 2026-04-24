@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import AiChatFloat from '@/components/dashboard/AiChatFloat'
 import MarketsStrip from '@/components/dashboard/MarketsStrip'
 import NewsFeed from '@/components/dashboard/NewsFeed'
 import PrimaryInstrumentPanel from '@/components/dashboard/PrimaryInstrumentPanel'
@@ -97,6 +98,7 @@ export default function Dashboard() {
           <NewsFeed items={data.news} />
         </div>
       </div>
+      <AiChatFloat />
     </div>
   )
 }

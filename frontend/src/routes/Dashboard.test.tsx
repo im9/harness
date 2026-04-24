@@ -109,6 +109,22 @@ describe('Dashboard route', () => {
     ).toBeInTheDocument()
   })
 
+  it('mounts the AI chat FAB as a labeled control on the dashboard', () => {
+    useDashboardMock.mockReturnValue({
+      data: dashboardDefault,
+      loading: false,
+      error: null,
+    })
+    render(<Dashboard />)
+    // ADR 004 §AI chat: the entry point is anchored to the dashboard,
+    // not a route of its own. Asserting on the FAB's accessible name
+    // keeps the integration stable across visual changes to the
+    // floating button.
+    expect(
+      screen.getByRole('button', { name: /open ai chat/i }),
+    ).toBeInTheDocument()
+  })
+
   it('shows an alert and keeps the snapshot when a stream error arrives', () => {
     useDashboardMock.mockReturnValue({
       data: dashboardDefault,
