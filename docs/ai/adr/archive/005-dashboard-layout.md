@@ -351,7 +351,7 @@ backend lands.
   realizes the dashboard route declared there).
 - [ADR 003](003-ui-foundations.md) — shadcn/ui + Tailwind + charting
   library choices this layout builds on.
-- [ADR 006](../006-ai-chat-widget.md) — AiChatFloat widget
+- [ADR 006](006-ai-chat-widget.md) — AiChatFloat widget
   (bottom-right FAB) that anchors to the dashboard.
 - **[future] Instrument management ADR** — adding / editing /
   removing tracked instruments; assigning setup-library entries per
