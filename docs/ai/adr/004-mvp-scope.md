@@ -163,6 +163,15 @@ on the swap mechanics described below.
   duplication), markets snapshot (global benchmark indices with
   last + pctChange), rule state (used / cap), recent news headlines.
 - Text in, text out. No tool use in Phase 1.
+- **Chat stays chat.** No side effects on other panels — no
+  parsing of reply text to drive UI actions (e.g. the originally
+  proposed "click an HH:MM in a reply, pulse a chart marker" was
+  retracted; ad-hoc text-scraping is the brittle pattern that
+  conventional LLM UIs avoid). Cross-anchor interactions belong
+  on structured info surfaces (news rows already carry `at`,
+  alerts will carry their trigger time, etc.). The chat panel
+  rejoins the cross-link story in Phase 2 when real LLM tool-use
+  / structured citations arrive.
 - **UI**: a 48 × 48 floating action button anchored to the
   dashboard's bottom-right corner. Click morphs the FAB into a
   bottom-right-anchored chat card (~420 × 640 px) by interpolating
@@ -481,11 +490,43 @@ mock-first against the payload contract; backend follows.
         echoes the prompt and ignores the snapshot body — the type
         contract is the load-bearing surface for the real provider,
         which prompt-caches the snapshot server-side.
-  - [ ] (i.3) Chart-marker cross-link. Detect time references in
-        assistant replies (e.g. `14:23`) and, on click of the
-        reference, pulse the corresponding marker on the primary
-        chart. Requires an imperative handle on `PriceChart`
-        (`pulseMarkerAt(time)`).
+  - [x] (i.3) Context-surface → chart cross-link. The originally
+        proposed "regex-parse HH:MM in chat replies" was dropped on
+        re-review (assistant-drafted spec; failed the
+        meaningful-trigger-in-mock-mode smell check — with the echo
+        provider the operator clicks their own typed time, pure
+        self-reference). Cross-anchor interactions belong on
+        **structured info surfaces** that already carry the anchor
+        as a first-class attribute, not on free-text chat output.
+        Phase 1 ships **news → chart**: `NewsFeed` accepts
+        `onSelect?: (item: NewsItem) => void`; when wired, each row
+        renders as a single button (tag · time · title) so the
+        whole cell is the click target, with an aria-label of
+        "Locate ‘…’ on the chart" so AT users hear what the click
+        does. Dashboard converts the headline's `at` ISO timestamp
+        to unix-seconds (`Math.floor(Date.parse(item.at) / 1000)`)
+        and calls `priceChartRef.current?.pulseMarkerAt(...)`.
+        `PriceChart` is now `forwardRef<PriceChartHandle>` exposing
+        `pulseMarkerAt(unixSec)`; the pulse is a transient DOM halo
+        overlay positioned at the chart's pixel coordinate via
+        `timeScale.timeToCoordinate` and animated by a CSS keyframe
+        (1.2s ease-out fade + scale, re-triggerable by toggling
+        `data-active` around a forced reflow). lightweight-charts
+        markers are static and cannot animate, so a separate halo
+        layer is the natural mechanism; out-of-visible-range times
+        (null coordinate) are a silent no-op rather than flashing at
+        left:0. `lib/display-timezone.ts` pins the operator's
+        reading frame to `Asia/Tokyo` and is wired into the chart's
+        `tickMarkFormatter` + `localization.timeFormatter` so the
+        x-axis and crosshair tooltip both read in JST regardless of
+        browser TZ. Future Localization Settings panel will replace
+        the constant with a DB-backed value (planned in a successor
+        ADR — Settings implementation patterns warrant their own
+        ADR rather than inline expansion of ADR 004's panel list).
+        **Non-goal in Phase 1**: AI chat as a trigger surface for
+        UI side-effects. Chat stays text-in/text-out; cross-anchor
+        from chat returns when ChatProvider has a real LLM mode and
+        a structured citation / tool-use channel (Phase 2).
   - [ ] Wire to the real `GET /api/dashboard` /
         `WebSocket /ws/dashboard` payload (with `primarySymbol`
         query / message parameter for swap).

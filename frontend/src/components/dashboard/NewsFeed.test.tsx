@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import type { NewsItem } from '@/lib/dashboard-types'
 import { formatRelativeTime } from '@/lib/time-format'
 import NewsFeed from './NewsFeed'
@@ -87,6 +88,47 @@ describe('NewsFeed', () => {
   it('renders an empty-state message when no headlines are pending', () => {
     render(<NewsFeed items={[]} nowMs={NOW_MS} />)
     expect(screen.getByText(/no headlines/i)).toBeInTheDocument()
+  })
+
+  it('keeps rows as static elements when no onSelect is wired', () => {
+    // Phase-1 default: callers that don't subscribe to the cross-link
+    // should not see operator-clickable rows. A button with no behavior
+    // would invite confused clicks ("nothing happened?") — staying as a
+    // <div> is the honest signal.
+    render(<NewsFeed items={makeItems()} nowMs={NOW_MS} />)
+    const region = screen.getByRole('complementary', { name: /news/i })
+    expect(region.querySelectorAll('button')).toHaveLength(0)
+  })
+
+  it('renders headline rows as buttons when onSelect is wired and surfaces the item on click', async () => {
+    // ADR 004 (i.3) news → chart cross-link. The row is a single
+    // button (tag · time · title) so the entire visible cell is the
+    // hit target — clicking anywhere within hands the item back to
+    // the parent for resolving against the chart.
+    const onSelect = vi.fn()
+    const items = makeItems()
+    const user = userEvent.setup()
+    render(<NewsFeed items={items} nowMs={NOW_MS} onSelect={onSelect} />)
+    const targetRow = screen.getByRole('button', {
+      name: /BOJ governor hints at cautious tightening/i,
+    })
+    await user.click(targetRow)
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onSelect).toHaveBeenCalledWith(items[0])
+  })
+
+  it('exposes each clickable row with an accessible "Locate on the chart" name', async () => {
+    // The aria-label tells screen-reader users what the click does
+    // (locates the headline on the chart). Without this, the button's
+    // accessible name would just be the headline title — which doesn't
+    // hint that the row is a chart-anchor trigger.
+    const onSelect = vi.fn()
+    render(<NewsFeed items={makeItems()} nowMs={NOW_MS} onSelect={onSelect} />)
+    expect(
+      screen.getByRole('button', {
+        name: /Locate "BOJ governor hints at cautious tightening" on the chart/i,
+      }),
+    ).toBeInTheDocument()
   })
 })
 

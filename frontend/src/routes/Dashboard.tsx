@@ -1,12 +1,13 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import AiChatFloat from '@/components/dashboard/AiChatFloat'
 import MarketsStrip from '@/components/dashboard/MarketsStrip'
 import NewsFeed from '@/components/dashboard/NewsFeed'
+import type { PriceChartHandle } from '@/components/dashboard/PriceChart'
 import PrimaryInstrumentPanel from '@/components/dashboard/PrimaryInstrumentPanel'
 import Watchlist from '@/components/dashboard/Watchlist'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ChatContext } from '@/lib/chat-client'
-import type { Timeframe } from '@/lib/dashboard-types'
+import type { NewsItem, Timeframe } from '@/lib/dashboard-types'
 import { useDashboard } from '@/lib/use-dashboard'
 
 const DEFAULT_TIMEFRAME: Timeframe = '10s'
@@ -36,6 +37,23 @@ export default function Dashboard() {
 
   const handleSwapPrimary = useCallback((symbol: string) => {
     setPrimarySymbol(symbol)
+  }, [])
+
+  // Imperative handle on the primary chart so the (i.3) chart-marker
+  // cross-link can pulse a marker when the operator clicks a news
+  // headline. The ref's value is set after PriceChart mounts; the
+  // handler below tolerates a null current (chart not yet mounted)
+  // by returning silently.
+  const priceChartRef = useRef<PriceChartHandle>(null)
+
+  const handleNewsSelect = useCallback((item: NewsItem) => {
+    // News items carry `at` as an ISO timestamp; the chart accepts
+    // unix-seconds (Bar.time convention). Date.parse → ms → seconds
+    // keeps the conversion in one place. Out-of-visible-range times
+    // are a silent no-op inside pulseMarkerAt.
+    const unixSec = Math.floor(Date.parse(item.at) / 1000)
+    if (Number.isNaN(unixSec)) return
+    priceChartRef.current?.pulseMarkerAt(unixSec)
   }, [])
 
   // Per-turn snapshot for the AI chat (ADR 004 §AI chat: auto-injected
@@ -102,6 +120,7 @@ export default function Dashboard() {
       )}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
         <PrimaryInstrumentPanel
+          ref={priceChartRef}
           row={data.primary}
           rule={data.rule}
           timeframe={tf}
@@ -113,7 +132,7 @@ export default function Dashboard() {
             the widget's own concern (d)(e), not the column's. */}
         <div className="flex min-h-0 flex-col gap-4">
           <Watchlist items={data.watchlist} onSwap={handleSwapPrimary} />
-          <NewsFeed items={data.news} />
+          <NewsFeed items={data.news} onSelect={handleNewsSelect} />
         </div>
       </div>
       <AiChatFloat context={chatContext} />

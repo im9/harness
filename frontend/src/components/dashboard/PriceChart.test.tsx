@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { createRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InstrumentRowState } from '@/lib/dashboard-types'
 
@@ -13,12 +14,18 @@ const {
   createSeriesMarkers,
   removeChart,
   addSeries,
+  timeToCoordinate,
 } = vi.hoisted(() => ({
   setData: vi.fn(),
   createPriceLine: vi.fn(),
   createSeriesMarkers: vi.fn(),
   removeChart: vi.fn(),
   addSeries: vi.fn(),
+  // Hoisted so the (i.3) pulse tests can `mockReturnValueOnce(123)`
+  // and assert the imperative handle resolved its argument through
+  // the chart's time→pixel mapping. Default returns null to match the
+  // jsdom "no canvas, no pixel" behavior.
+  timeToCoordinate: vi.fn<(time: unknown) => number | null>(() => null),
 }))
 
 vi.mock('lightweight-charts', () => ({
@@ -38,7 +45,7 @@ vi.mock('lightweight-charts', () => ({
     removeSeries: vi.fn(),
     timeScale: () => ({
       fitContent: vi.fn(),
-      timeToCoordinate: vi.fn(() => null),
+      timeToCoordinate,
       subscribeVisibleTimeRangeChange: vi.fn(),
       unsubscribeVisibleTimeRangeChange: vi.fn(),
     }),
@@ -55,7 +62,7 @@ vi.mock('lightweight-charts', () => ({
   LineSeries: { __tag: 'Line' },
 }))
 
-import PriceChart from './PriceChart'
+import PriceChart, { type PriceChartHandle } from './PriceChart'
 
 function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
   const base: InstrumentRowState = {
@@ -95,6 +102,8 @@ beforeEach(() => {
   createSeriesMarkers.mockClear()
   removeChart.mockClear()
   addSeries.mockClear()
+  timeToCoordinate.mockReset()
+  timeToCoordinate.mockReturnValue(null)
 })
 
 afterEach(() => {
@@ -103,6 +112,8 @@ afterEach(() => {
   createSeriesMarkers.mockClear()
   removeChart.mockClear()
   addSeries.mockClear()
+  timeToCoordinate.mockReset()
+  timeToCoordinate.mockReturnValue(null)
 })
 
 describe('PriceChart', () => {
@@ -339,5 +350,62 @@ describe('PriceChart', () => {
     })
     expect(volumeCall).toBeDefined()
     expect((volumeCall?.[0] as unknown[]).length).toBe(2)
+  })
+
+  it('exposes a pulseMarkerAt imperative handle that positions a halo at the chart x-coordinate', () => {
+    // ADR 004 (i.3) chart-marker cross-link: AiChatFloat clicks an
+    // HH:MM time reference in an assistant reply, which routes (via
+    // Dashboard's ref) into this imperative handle. The chart asks
+    // its time scale for the pixel coordinate of that unix-second
+    // and positions a halo overlay there. lightweight-charts markers
+    // are static and cannot animate, so the halo is a separate DOM
+    // element with a CSS animation triggered via a class toggle.
+    timeToCoordinate.mockReturnValue(123)
+    const ref = createRef<PriceChartHandle>()
+    const { container } = render(
+      <PriceChart
+        ref={ref}
+        timeframe="10s"
+        onTimeframeChange={() => {}}
+        row={row()}
+      />,
+    )
+    expect(ref.current).not.toBeNull()
+    ref.current!.pulseMarkerAt(1_777_000_000)
+    expect(timeToCoordinate).toHaveBeenLastCalledWith(1_777_000_000)
+    const halo = container.querySelector(
+      '[data-testid="chart-marker-halo"]',
+    ) as HTMLElement | null
+    expect(halo).not.toBeNull()
+    expect(halo!.style.left).toBe('123px')
+    // The "active" data attribute is the test-visible signal that
+    // the pulse animation was triggered; the visual itself (CSS
+    // keyframe) lives in the global stylesheet and is exercised in
+    // browser verification, not jsdom.
+    expect(halo!.dataset.active).toBe('true')
+  })
+
+  it('is a silent no-op when the requested time has no pixel coordinate', () => {
+    // Out-of-visible-range times (the operator panned past, or the
+    // bar series has not reached that timestamp yet) yield a null
+    // coordinate from lightweight-charts. The handle must not throw
+    // and must not flash the halo at left:0 — silence is the right
+    // signal for "no marker to find here".
+    timeToCoordinate.mockReturnValue(null)
+    const ref = createRef<PriceChartHandle>()
+    const { container } = render(
+      <PriceChart
+        ref={ref}
+        timeframe="10s"
+        onTimeframeChange={() => {}}
+        row={row()}
+      />,
+    )
+    ref.current!.pulseMarkerAt(1_777_000_000)
+    const halo = container.querySelector(
+      '[data-testid="chart-marker-halo"]',
+    ) as HTMLElement | null
+    expect(halo).not.toBeNull()
+    expect(halo!.dataset.active).not.toBe('true')
   })
 })

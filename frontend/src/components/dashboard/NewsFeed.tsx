@@ -8,6 +8,13 @@ export interface NewsFeedProps {
   // Injectable "now" for deterministic tests. Omitted in production
   // renders, which capture Date.now() at render time.
   nowMs?: number
+  // ADR 004 (i.3) news → chart cross-link. When provided, each
+  // headline becomes a clickable button; the click hands the item
+  // back to the parent, which resolves the headline's `at` to a
+  // unix-second and pulses the chart marker at that coordinate.
+  // Omitting it keeps the rows as static <div>s (Phase-1 default
+  // for callers that don't wire the cross-link).
+  onSelect?: (item: NewsItem) => void
 }
 
 const IMPACT_TONE: Record<ImpactTier, string> = {
@@ -33,7 +40,7 @@ const IMPACT_LABEL: Record<ImpactTier, string> = {
 // and anything slower risks the 59-sec → 1m transition lingering.
 const RELATIVE_TIME_TICK_MS = 30_000
 
-export default function NewsFeed({ items, nowMs }: NewsFeedProps) {
+export default function NewsFeed({ items, nowMs, onSelect }: NewsFeedProps) {
   // Date.now() is a side effect in React 19's purity model, so the
   // wall-clock "now" lives in state with a lazy initializer (allowed
   // at mount) and a setInterval ticker (allowed inside useEffect).
@@ -59,30 +66,62 @@ export default function NewsFeed({ items, nowMs }: NewsFeedProps) {
         News
       </h2>
       <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1 pb-1">
-        {items.map((item) => (
-          <li
-            key={item.id}
-            className="flex flex-col gap-1 rounded px-2 py-2"
-          >
-            <div className="flex items-center gap-2 text-[11px]">
-              <span
-                className={cn(
-                  'inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase',
-                  IMPACT_TONE[item.impactTier],
-                )}
-                data-impact={item.impactTier}
-              >
-                {IMPACT_LABEL[item.impactTier]}
-              </span>
-              <span className="text-muted-foreground tabular-nums">
-                {formatRelativeTime(item.at, now)}
-              </span>
-            </div>
+        {items.map((item) => {
+          const tag = (
+            <span
+              className={cn(
+                'inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase',
+                IMPACT_TONE[item.impactTier],
+              )}
+              data-impact={item.impactTier}
+            >
+              {IMPACT_LABEL[item.impactTier]}
+            </span>
+          )
+          const time = (
+            <span className="text-muted-foreground tabular-nums">
+              {formatRelativeTime(item.at, now)}
+            </span>
+          )
+          const title = (
             <p className="text-foreground text-sm leading-snug">
               {item.title}
             </p>
-          </li>
-        ))}
+          )
+          return (
+            <li key={item.id}>
+              {onSelect ? (
+                // Whole row as a button so the click target spans the
+                // tag, time, and title. `text-left` is necessary because
+                // <button> defaults to text-align:center, which would
+                // shove the title onto its center axis.
+                <button
+                  type="button"
+                  onClick={() => onSelect(item)}
+                  aria-label={`Locate "${item.title}" on the chart`}
+                  className={cn(
+                    'flex w-full cursor-pointer flex-col gap-1 rounded px-2 py-2 text-left',
+                    'hover:bg-muted/40 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2',
+                  )}
+                >
+                  <span className="flex items-center gap-2 text-[11px]">
+                    {tag}
+                    {time}
+                  </span>
+                  {title}
+                </button>
+              ) : (
+                <div className="flex flex-col gap-1 rounded px-2 py-2">
+                  <div className="flex items-center gap-2 text-[11px]">
+                    {tag}
+                    {time}
+                  </div>
+                  {title}
+                </div>
+              )}
+            </li>
+          )
+        })}
         {items.length === 0 && (
           <li className="text-muted-foreground px-2 py-3 text-xs">
             No headlines
