@@ -288,9 +288,21 @@ Component boundaries (Phase 1 frontend):
   instrument data (bars / indicators / setup / macro) — those live
   on the primary payload only and are recomputed by the backend
   when a swap promotes a new instrument to primary.
-- `NewsFeed` widget — streamed headline list (impact tag + time +
-  title). Read-only in Phase 1 — filter, source badges, sentiment,
-  click-through detail are Future extensions.
+- `NewsFeed` widget — streamed headline list with master–detail
+  paging inside the widget footprint. Each list row shows the
+  impact tag, the **exact JST time** of the headline (alongside a
+  relative "Xm ago" for glanceable recency), and the title. If the
+  `NewsItem` carries any of `source` / `body` / `url`, the row is
+  a button that swaps the widget body to a detail view (back
+  control + meta + full title + source + body + external link).
+  Inline-expand alternatives (`<details>`) were tried and discarded
+  — the right column is too narrow for comfortable in-row reading
+  of a multi-sentence body; paging gives the detail its own
+  full-height canvas while the operator stays in the dashboard's
+  visual rhythm (no modal, no new tab). Rows without any detail
+  stay as static read-only cells (graceful degradation: a partial
+  feed from a provider adapter still renders cleanly). Filter bar,
+  source badges, sentiment tags are Future extensions.
 - `AiChatFloat` — floating action button anchored bottom-right
   that morphs into a bottom-right-anchored chat card as described
   in the AI chat section.
@@ -433,14 +445,29 @@ mock-first against the payload contract; backend follows.
         instance per row. Last-price formatting derives decimals
         from `instrument.tickSize` so the row value agrees with
         the chart's candle closes for the same symbol.
-  - [x] (h) `NewsFeed` widget — streamed headline list (impact tag
-        + relative time + title). Each row stacks the tag + time on
-        one line over the headline on a second so long titles wrap
-        without pushing the tag off-screen. `formatRelativeTime`
-        buckets into `now` / `Xm ago` / `Xh ago` / `Xh Ym ago` and
-        clamps future timestamps to `now` to survive clock skew.
-        Read-only; filter, source badges, sentiment, click-through
-        detail remain Future extensions.
+  - [x] (h) `NewsFeed` widget — streamed headline list with
+        exact-JST time + relative "Xm ago" + title on each row.
+        `formatRelativeTime` buckets into `now` / `Xm ago` / `Xh ago`
+        / `Xh Ym ago` and clamps future timestamps to `now` to
+        survive clock skew. `NewsItem` carries optional `source` /
+        `body` / `url`; when any of those is populated the row is a
+        button that swaps the widget body to a detail view (back
+        control, full meta, full title, source pill, body text,
+        external `Read full article →` link). Master–detail paging
+        inside the widget footprint beat the first-try inline
+        `<details>` disclosure — the right column is too narrow for
+        readable in-row bodies, and paging gives the detail view its
+        own full-height canvas while keeping the operator in the
+        dashboard's visual rhythm (no modal, no new tab). Detail is
+        dismissable via the back button or Escape; back button
+        receives initial focus for keyboard parity. If the viewed
+        item disappears from a subsequent payload (stream dropped
+        it), the widget falls back to the list — state is derived
+        from `items.find(id)` each render so no explicit sync
+        effect is needed. External link carries `rel="noopener
+        noreferrer"` + `target="_blank"`. Rows without any detail
+        stay as plain read-only cells. Filter bar, source badges,
+        sentiment tags are Future extensions.
   - [x] (i.1) Panel shell + echo-mode turn loop. `chat-client.ts`
         vends a mock ChatProvider in `echo` mode (deterministic
         `Echo: …` replies, monotonic ids, unix-second timestamps)
@@ -490,43 +517,37 @@ mock-first against the payload contract; backend follows.
         echoes the prompt and ignores the snapshot body — the type
         contract is the load-bearing surface for the real provider,
         which prompt-caches the snapshot server-side.
-  - [x] (i.3) Context-surface → chart cross-link. The originally
-        proposed "regex-parse HH:MM in chat replies" was dropped on
-        re-review (assistant-drafted spec; failed the
-        meaningful-trigger-in-mock-mode smell check — with the echo
-        provider the operator clicks their own typed time, pure
-        self-reference). Cross-anchor interactions belong on
-        **structured info surfaces** that already carry the anchor
-        as a first-class attribute, not on free-text chat output.
-        Phase 1 ships **news → chart**: `NewsFeed` accepts
-        `onSelect?: (item: NewsItem) => void`; when wired, each row
-        renders as a single button (tag · time · title) so the
-        whole cell is the click target, with an aria-label of
-        "Locate ‘…’ on the chart" so AT users hear what the click
-        does. Dashboard converts the headline's `at` ISO timestamp
-        to unix-seconds (`Math.floor(Date.parse(item.at) / 1000)`)
-        and calls `priceChartRef.current?.pulseMarkerAt(...)`.
-        `PriceChart` is now `forwardRef<PriceChartHandle>` exposing
-        `pulseMarkerAt(unixSec)`; the pulse is a transient DOM halo
-        overlay positioned at the chart's pixel coordinate via
-        `timeScale.timeToCoordinate` and animated by a CSS keyframe
-        (1.2s ease-out fade + scale, re-triggerable by toggling
-        `data-active` around a forced reflow). lightweight-charts
-        markers are static and cannot animate, so a separate halo
-        layer is the natural mechanism; out-of-visible-range times
-        (null coordinate) are a silent no-op rather than flashing at
-        left:0. `lib/display-timezone.ts` pins the operator's
-        reading frame to `Asia/Tokyo` and is wired into the chart's
-        `tickMarkFormatter` + `localization.timeFormatter` so the
-        x-axis and crosshair tooltip both read in JST regardless of
-        browser TZ. Future Localization Settings panel will replace
-        the constant with a DB-backed value (planned in a successor
-        ADR — Settings implementation patterns warrant their own
-        ADR rather than inline expansion of ADR 004's panel list).
-        **Non-goal in Phase 1**: AI chat as a trigger surface for
-        UI side-effects. Chat stays text-in/text-out; cross-anchor
-        from chat returns when ChatProvider has a real LLM mode and
-        a structured citation / tool-use channel (Phase 2).
+  - [ ] (i.3) Chart-marker cross-link. **Deferred.** Two successive
+        attempts were retracted: (1) the original "regex-parse HH:MM
+        in chat replies" failed the meaningful-trigger-in-mock-mode
+        check — echo provider replies with the operator's own typed
+        time (self-reference), and ad-hoc text-scraping is the
+        brittle pattern conventional LLM UIs avoid. (2) The pivot to
+        "news headline click → pulse chart marker" built a
+        mechanism (forwardRef handle + DOM halo + CSS keyframe) but
+        lacked a validated UX — a 1.2 s pulse is ephemeral, and when
+        the referenced time sits outside the visible range the
+        click is a silent no-op (operator can't tell if the click
+        failed or the feature). Both attempts illustrate the same
+        failure mode: building for plausibility ("times exist on
+        both surfaces so cross-link them") instead of for a
+        validated operator need. The pulse mechanism has been
+        removed (PriceChart is back to a plain default export, no
+        imperative handle, no halo overlay, no global keyframe) —
+        dead code is deleted, not preserved. The useful spin-off —
+        `lib/display-timezone.ts` pinning the operator's reading
+        frame to `Asia/Tokyo` and feeding the chart's
+        `tickMarkFormatter` + `localization.timeFormatter` — stays,
+        since axis labels in market time have independent value
+        regardless of any cross-link. Revisit this increment only
+        when a concrete operator workflow demands it and the full
+        UX (including "scroll chart into view if target is off-
+        screen" and "persistent anchor, not ephemeral flash") is
+        designed first. **Non-goal in Phase 1**: AI chat as a
+        trigger surface for UI side-effects. Chat stays text-in /
+        text-out (see §AI chat "Chat stays chat" bullet); cross-
+        anchor from chat rejoins only when ChatProvider has a real
+        LLM mode with structured citations / tool-use (Phase 2).
   - [ ] Wire to the real `GET /api/dashboard` /
         `WebSocket /ws/dashboard` payload (with `primarySymbol`
         query / message parameter for swap).

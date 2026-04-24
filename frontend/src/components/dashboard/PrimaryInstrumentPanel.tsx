@@ -1,5 +1,4 @@
-import { forwardRef } from 'react'
-import PriceChart, { type PriceChartHandle } from './PriceChart'
+import PriceChart from './PriceChart'
 import RuleGauge from './RuleGauge'
 import StateBanner from './StateBanner'
 import type {
@@ -19,16 +18,13 @@ export interface PrimaryInstrumentPanelProps {
 // state banner, the price chart (with its volume sub-pane and all setup
 // annotations), and the rule gauge into a single vertical stack so the
 // operator reads the full decision context without eye-darting across
-// the page. Forwards a `PriceChartHandle` ref so the Dashboard can wire
-// the (i.3) chart-marker pulse without reaching through this layer's
-// internals.
-const PrimaryInstrumentPanel = forwardRef<
-  PriceChartHandle,
-  PrimaryInstrumentPanelProps
->(function PrimaryInstrumentPanel(
-  { row, rule, timeframe, onTimeframeChange },
-  ref,
-) {
+// the page.
+export default function PrimaryInstrumentPanel({
+  row,
+  rule,
+  timeframe,
+  onTimeframeChange,
+}: PrimaryInstrumentPanelProps) {
   return (
     // h-full + min-h-0 hands the remaining viewport height from the
     // Dashboard grid down to this panel; the chart wrapper below uses
@@ -42,7 +38,6 @@ const PrimaryInstrumentPanel = forwardRef<
       <StateBanner row={row} />
       <div className="flex min-h-0 flex-1 flex-col">
         <PriceChart
-          ref={ref}
           row={row}
           timeframe={timeframe}
           onTimeframeChange={onTimeframeChange}
@@ -51,6 +46,4 @@ const PrimaryInstrumentPanel = forwardRef<
       <RuleGauge rule={rule} />
     </section>
   )
-})
-
-export default PrimaryInstrumentPanel
+}

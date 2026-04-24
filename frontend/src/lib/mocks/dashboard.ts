@@ -450,23 +450,36 @@ const NEWS_ITEMS: NewsItem[] = [
   // Hand-authored headlines that read like a wire feed, pinned to
   // offsets from END_TIME_SEC so the list always looks recent. Fully
   // fictional — no real sources, no operator-specific positioning.
+  // Body / source / url are illustrative: they exist so the operator
+  // can rehearse the expand-for-detail flow without a real provider
+  // wired. Mixing fully-populated rows with partials (one row with
+  // source only, another without a URL) also covers the graceful-
+  // degradation path the component needs to support.
   {
     id: 'news-1',
     title: 'BOJ governor hints at cautious tightening in afternoon remarks',
     impactTier: 'high',
     at: new Date((END_TIME_SEC - 2 * 60) * 1000).toISOString(),
+    source: 'Wire (mock)',
+    body:
+      'Governor signaled openness to further policy normalization if wage growth persists into the autumn survey round, while keeping the door open to a pause if household consumption data softens first.',
+    url: 'https://example.test/news/boj-hints-tightening',
   },
   {
     id: 'news-2',
     title: 'US crude stockpiles fall sharply, beating consensus',
     impactTier: 'medium',
     at: new Date((END_TIME_SEC - 14 * 60) * 1000).toISOString(),
+    source: 'Weekly inventory report (mock)',
+    body:
+      'Commercial crude inventories fell 4.2 million barrels last week against a consensus draw of 1.1 million, with refinery utilization ticking up to 91.4% as the summer driving season begins.',
   },
   {
     id: 'news-3',
     title: 'European equities open mixed ahead of ECB commentary',
     impactTier: 'low',
     at: new Date((END_TIME_SEC - 35 * 60) * 1000).toISOString(),
+    source: 'Market wrap (mock)',
   },
   {
     id: 'news-4',

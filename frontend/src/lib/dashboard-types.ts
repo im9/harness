@@ -165,14 +165,24 @@ export interface WatchlistItem {
   sparkline: SparklinePoint[]
 }
 
-// Streamed headline shown in the right-column NewsFeed. Read-only in
-// Phase 1 — filter, source badge, sentiment, click-through detail are
-// Future extensions (ADR 004 Future extensions).
+// Streamed headline shown in the right-column NewsFeed. Source /
+// body / URL are what the operator actually needs to act on a
+// headline — they were deferred to Future extensions in earlier
+// drafts but have been pulled into Phase 1 because "tag + time +
+// title" alone doesn't earn the widget's real estate (the operator
+// can't tell what actually happened, only that something of the
+// given impact did). All three are optional so mock scenarios and
+// future provider adapters can populate them progressively; the
+// NewsFeed renders inline expansion only when at least one detail
+// field is present.
 export interface NewsItem {
   id: string
   title: string
   impactTier: ImpactTier
   at: string
+  source?: string
+  body?: string
+  url?: string
 }
 
 // Cash benchmark index rendered in the top Markets strip (ADR 004

@@ -11,7 +11,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts'
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type {
   IndicatorKind,
   InstrumentRowState,
@@ -26,20 +26,6 @@ interface PriceChartProps {
   timeframe: Timeframe
   onTimeframeChange: (next: Timeframe) => void
 }
-
-// Imperative handle exposed to ancestors that need to highlight a
-// specific time on the chart (ADR 004 (i.3) chart-marker cross-link:
-// AiChatFloat clicks an HH:MM in an assistant reply, Dashboard
-// resolves it to a unix-second via display-timezone, and routes it
-// here). The pulse is a transient DOM overlay positioned via the
-// chart's time→pixel mapping — lightweight-charts markers are static
-// and cannot animate, so a halo + CSS keyframe is the natural mechanism.
-export interface PriceChartHandle {
-  pulseMarkerAt: (unixSec: number) => void
-}
-
-// Halo cleanup window. Matches the keyframe duration in index.css.
-const PULSE_DURATION_MS = 1200
 
 // Pre-built Intl formatters for non-Time tick types. Re-using the
 // instances avoids per-tick allocation churn during chart panning.
@@ -206,8 +192,11 @@ function positionMacroBand(
   band.style.width = `${width}px`
 }
 
-const PriceChart = forwardRef<PriceChartHandle, PriceChartProps>(
-  function PriceChart({ row, timeframe, onTimeframeChange }, ref) {
+export default function PriceChart({
+  row,
+  timeframe,
+  onTimeframeChange,
+}: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candlesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -215,8 +204,6 @@ const PriceChart = forwardRef<PriceChartHandle, PriceChartProps>(
   const indicatorsRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map())
   const priceLinesRef = useRef<IPriceLine[]>([])
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
-  const haloRef = useRef<HTMLDivElement>(null)
-  const haloTimerRef = useRef<number | null>(null)
   const macroBandRef = useRef<HTMLDivElement>(null)
   // Captured seconds-since-epoch window, re-set on every row payload
   // so the visible-range subscriber (which fires on pan / zoom without
@@ -243,50 +230,6 @@ const PriceChart = forwardRef<PriceChartHandle, PriceChartProps>(
   // a squished or out-of-frame candle run.
   const lastSymbolRef = useRef<string | null>(null)
   const hasBars = row.bars.length > 0
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      pulseMarkerAt(unixSec: number): void {
-        const chart = chartRef.current
-        const halo = haloRef.current
-        if (!chart || !halo) return
-        const x = chart
-          .timeScale()
-          .timeToCoordinate(unixSec as UTCTimestamp)
-        // Out-of-visible-range / not-yet-loaded times return null;
-        // silence is the right signal for "no marker to find here"
-        // (a flash at left:0 would point to a nonsense location).
-        if (x == null) return
-        halo.style.left = `${x}px`
-        // Restart the keyframe by toggling the trigger attribute
-        // around a forced reflow; CSS animations otherwise refuse
-        // to re-fire when the same trigger value is re-applied.
-        halo.dataset.active = 'false'
-        void halo.offsetWidth
-        halo.dataset.active = 'true'
-        if (haloTimerRef.current != null) {
-          clearTimeout(haloTimerRef.current)
-        }
-        haloTimerRef.current = window.setTimeout(() => {
-          halo.dataset.active = 'false'
-          haloTimerRef.current = null
-        }, PULSE_DURATION_MS)
-      },
-    }),
-    [],
-  )
-
-  useEffect(() => {
-    // Clear the pulse timeout on unmount so a delayed dataset write
-    // never lands on a detached node.
-    return () => {
-      if (haloTimerRef.current != null) {
-        clearTimeout(haloTimerRef.current)
-        haloTimerRef.current = null
-      }
-    }
-  }, [])
 
   // Create the chart once per mount (re-creation only if `height` or
   // `hasBars` changes). Streaming payload updates do not rebuild the
@@ -612,23 +555,7 @@ const PriceChart = forwardRef<PriceChartHandle, PriceChartProps>(
             style={{ left: 0, width: 0 }}
           />
         )}
-        {/* Halo overlay for the (i.3) chart-marker cross-link.
-            Positioned absolutely; the imperative pulseMarkerAt
-            handle sets `left` to the chart's pixel coordinate for
-            the requested time and toggles data-active to fire the
-            CSS keyframe. The element stays mounted in both states
-            so a click that arrives mid-pulse can re-trigger by
-            resetting the attribute (no remount cost). */}
-        <div
-          ref={haloRef}
-          data-testid="chart-marker-halo"
-          className="chart-marker-halo pointer-events-none absolute"
-          style={{ left: 0, top: '50%' }}
-          aria-hidden
-        />
       </div>
     </div>
   )
-})
-
-export default PriceChart
+}
