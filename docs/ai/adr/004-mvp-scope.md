@@ -163,13 +163,17 @@ on the swap mechanics described below.
   duplication), markets snapshot (global benchmark indices with
   last + pctChange), rule state (used / cap), recent news headlines.
 - Text in, text out. No tool use in Phase 1.
-- **UI**: a floating action button anchored to the dashboard's
-  bottom-right corner. Click expands into a right-aligned slide-in
-  panel (~400–500 px wide). The dashboard stays fully visible under
-  the panel (no dim overlay) so the operator can keep reading the
-  chart while composing a question about it; close returns the
-  dashboard to its uninterrupted view. Mobile collapses the panel to
-  full screen.
+- **UI**: a 48 × 48 floating action button anchored to the
+  dashboard's bottom-right corner. Click morphs the FAB into a
+  bottom-right-anchored chat card (~420 × 640 px) by interpolating
+  width / height / border-radius only — the surface reads as one
+  element deforming rather than a separate panel flying in. The
+  dashboard stays fully visible around the card (non-modal, no dim
+  overlay) so the operator can keep reading the chart while
+  composing a question about it; close reverses the morph back to
+  the FAB. Narrow viewports clamp the card to the available space
+  (`width: min(420px, 100vw - 3rem)`, `height: min(640px,
+  100dvh - 6rem)`) while keeping the same morph-from-FAB behavior.
 
 ### Dashboard layout
 
@@ -278,9 +282,9 @@ Component boundaries (Phase 1 frontend):
 - `NewsFeed` widget — streamed headline list (impact tag + time +
   title). Read-only in Phase 1 — filter, source badges, sentiment,
   click-through detail are Future extensions.
-- `AiChatFloat` — floating action button anchored bottom-right;
-  expands into a right-aligned slide-in panel as described in the AI
-  chat section.
+- `AiChatFloat` — floating action button anchored bottom-right
+  that morphs into a bottom-right-anchored chat card as described
+  in the AI chat section.
 
 Right-column widgets stack vertically (Watchlist above NewsFeed).
 Widget order is fixed in Phase 1; reorder / hide is a Future
@@ -428,10 +432,37 @@ mock-first against the payload contract; backend follows.
         clamps future timestamps to `now` to survive clock skew.
         Read-only; filter, source badges, sentiment, click-through
         detail remain Future extensions.
-  - [ ] (i) `AiChatFloat` — FAB bottom-right → right-aligned
-        slide-in panel. SSE consumer; cross-link to chart markers
-        when the AI references a chart element by time ("the sweep
-        at 14:23" pulses the corresponding marker).
+  - [x] (i.1) Panel shell + echo-mode turn loop. `chat-client.ts`
+        vends a mock ChatProvider in `echo` mode (deterministic
+        `Echo: …` replies, monotonic ids, unix-second timestamps)
+        ahead of the streaming provider. `AiChatFloat` is a single
+        container anchored bottom-right that morphs between a 48 × 48
+        circle (FAB state) and a ~420 × 640 card (panel state) by
+        interpolating width / height / border-radius only — bg, text,
+        and border colors are invariant so there is no mid-tone
+        bleed through the transition. FAB icon and panel content
+        exchange via the HTML `hidden` attribute (display:none +
+        a11y-tree removal) rather than opacity, so at every frame
+        the user sees exactly one of the two surfaces. Enter-to-send
+        skips on `event.nativeEvent.isComposing` so IME commits
+        (CJK input) never fire a stale submit; `flushSync` plus an
+        imperative composer clear harden the draft reset. Close
+        control is a `-` minimize glyph (not ×) since the surface is
+        session-ephemeral and will be reopened many times. Closed
+        border-radius uses an explicit 24px (half the 48px side) so
+        the morph interpolates linearly to the open state's 8px
+        without clamping to a pill shape mid-transition.
+  - [ ] (i.2) Streaming via SSE + auto-injected context. Replace
+        the echo provider with an SSE consumer that streams the
+        assistant reply in chunks; auto-inject the current `primary`
+        / `watchlist` / `markets` / `rule` / recent `news` snapshot
+        per turn (prompt-cached on the server side) as described in
+        the AI chat section.
+  - [ ] (i.3) Chart-marker cross-link. Detect time references in
+        assistant replies (e.g. `14:23`) and, on click of the
+        reference, pulse the corresponding marker on the primary
+        chart. Requires an imperative handle on `PriceChart`
+        (`pulseMarkerAt(time)`).
   - [ ] Wire to the real `GET /api/dashboard` /
         `WebSocket /ws/dashboard` payload (with `primarySymbol`
         query / message parameter for swap).
