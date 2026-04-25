@@ -1,4 +1,5 @@
 import type { InstrumentRowState, RecommendationState } from '@/lib/dashboard-types'
+import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 // Outer banner tone — kept subtle. The badge on the right carries the
@@ -52,6 +53,7 @@ interface StateBannerProps {
 // everything else in the banner is subordinate to that glance.
 export default function StateBanner({ row }: StateBannerProps) {
   const { instrument, state, setup } = row
+  const { t } = useTranslation()
   return (
     <div
       role="status"
@@ -85,7 +87,7 @@ export default function StateBanner({ row }: StateBannerProps) {
           <span className="text-foreground font-medium">{setup.setupName}</span>
           <span className="uppercase">{setup.side}</span>
           <span>
-            target{' '}
+            {t('state.target')}{' '}
             <span className="text-emerald-600 tabular-nums dark:text-emerald-400">
               {setup.target.price.toLocaleString()}
             </span>
@@ -93,7 +95,7 @@ export default function StateBanner({ row }: StateBannerProps) {
             {setup.target.label}
           </span>
           <span>
-            retreat{' '}
+            {t('state.retreat')}{' '}
             <span className="text-rose-600 tabular-nums dark:text-rose-400">
               {setup.retreat.price.toLocaleString()}
             </span>

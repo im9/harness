@@ -23,6 +23,15 @@ function jsonResponse(status: number, body: unknown = {}): Response {
   })
 }
 
+// Settings response body these App-routing tests rely on. Pinning
+// language to `en` keeps the dashboard's aria-labels in English so
+// existing accessibility assertions (`/markets/i` etc.) match. The
+// JA-language path is exercised in the dedicated i18n test instead;
+// app-routing concerns shouldn't double as language assertions.
+const EN_SETTINGS = {
+  localization: { displayTimezone: 'Asia/Tokyo', language: 'en' },
+}
+
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -56,7 +65,9 @@ describe('App routing', () => {
 
   it('unmatched paths render a NotFound view inside the shell', async () => {
     const fetchMock = mockFetch()
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { username: 'alice' }))
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, { username: 'alice' }))
+      .mockResolvedValueOnce(jsonResponse(200, EN_SETTINGS))
 
     renderAt('/does-not-exist')
 
@@ -85,7 +96,9 @@ describe('App routing', () => {
 
   it('when the session probe returns 200, the root route renders the dashboard', async () => {
     const fetchMock = mockFetch()
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { id: 1, username: 'alice' }))
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, { id: 1, username: 'alice' }))
+      .mockResolvedValueOnce(jsonResponse(200, EN_SETTINGS))
 
     renderAt('/')
 
@@ -108,6 +121,7 @@ describe('App routing', () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(401)) // initial probe
       .mockResolvedValueOnce(jsonResponse(200, { username: 'alice' })) // /api/auth/login
+      .mockResolvedValueOnce(jsonResponse(200, EN_SETTINGS)) // /api/settings after auth
 
     renderAt('/login')
 
@@ -151,6 +165,7 @@ describe('App routing', () => {
     const fetchMock = mockFetch()
     fetchMock
       .mockResolvedValueOnce(jsonResponse(200, { id: 1, username: 'alice' })) // probe
+      .mockResolvedValueOnce(jsonResponse(200, EN_SETTINGS)) // /api/settings
       .mockResolvedValueOnce(jsonResponse(204)) // logout
 
     renderAt('/')

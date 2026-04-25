@@ -1,4 +1,5 @@
 import type { RecommendationState, WatchlistItem } from '@/lib/dashboard-types'
+import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import Sparkline from './Sparkline'
 
@@ -51,13 +52,14 @@ function formatPrice(value: number, tickSize: number): string {
 // last price. No per-row chart, no timeframe switcher, no
 // interactions beyond click-to-swap.
 export default function Watchlist({ items, onSwap }: WatchlistProps) {
+  const { t } = useTranslation()
   return (
     <aside
-      aria-label="Watchlist"
+      aria-label={t('watchlist.aria')}
       className="border-border bg-card/40 flex min-h-0 flex-1 flex-col rounded-lg border"
     >
       <h2 className="text-muted-foreground px-3 pt-3 pb-2 text-xs font-medium tracking-wide uppercase">
-        Watchlist
+        {t('watchlist.title')}
       </h2>
       <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1 pb-1">
         {items.map((item) => {
@@ -71,7 +73,10 @@ export default function Watchlist({ items, onSwap }: WatchlistProps) {
                 type="button"
                 onClick={() => onSwap(item.instrument.symbol)}
                 data-state={item.state.toLowerCase()}
-                aria-label={`Swap primary to ${item.instrument.symbol} ${item.instrument.displayName}`}
+                aria-label={t('watchlist.swap.aria', {
+                  symbol: item.instrument.symbol,
+                  name: item.instrument.displayName,
+                })}
                 className="hover:bg-accent focus-visible:ring-ring grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-3 rounded px-2 py-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2"
               >
                 <span
@@ -109,7 +114,7 @@ export default function Watchlist({ items, onSwap }: WatchlistProps) {
         })}
         {items.length === 0 && (
           <li className="text-muted-foreground px-2 py-3 text-xs">
-            No secondary instruments tracked
+            {t('watchlist.empty')}
           </li>
         )}
       </ul>

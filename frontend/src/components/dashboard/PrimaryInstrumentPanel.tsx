@@ -6,6 +6,7 @@ import type {
   RuleOverlayState,
   Timeframe,
 } from '@/lib/dashboard-types'
+import { useTranslation } from '@/lib/i18n'
 
 export interface PrimaryInstrumentPanelProps {
   row: InstrumentRowState
@@ -25,6 +26,7 @@ export default function PrimaryInstrumentPanel({
   timeframe,
   onTimeframeChange,
 }: PrimaryInstrumentPanelProps) {
+  const { t } = useTranslation()
   return (
     // h-full + min-h-0 hands the remaining viewport height from the
     // Dashboard grid down to this panel; the chart wrapper below uses
@@ -32,7 +34,7 @@ export default function PrimaryInstrumentPanel({
     // rule gauge. This is the ADR 004 "hero chart" contract: banner
     // and rule gauge are status strips, the chart is the surface.
     <section
-      aria-label={`Primary instrument: ${row.instrument.displayName}`}
+      aria-label={t('primary.aria', { name: row.instrument.displayName })}
       className="flex h-full min-h-0 flex-col gap-3"
     >
       <StateBanner row={row} />

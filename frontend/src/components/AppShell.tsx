@@ -3,11 +3,13 @@ import { LogOut } from 'lucide-react'
 import { useAuth } from '@/auth-context'
 import ThemeToggle from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
+import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 export default function AppShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const handleLogout = async () => {
     await logout()
@@ -18,10 +20,15 @@ export default function AppShell() {
     <div className="bg-background text-foreground flex h-dvh flex-col">
       <header className="border-border bg-background border-b">
         <div className="mx-auto flex h-14 w-full max-w-screen-2xl items-center gap-6 px-4">
+          {/* Product name "harness" stays verbatim per ADR 009 — proper
+              noun, not translated. */}
           <Link to="/" className="text-sm font-semibold tracking-tight">
             harness
           </Link>
-          <nav aria-label="Primary" className="flex items-center gap-4 text-sm">
+          <nav
+            aria-label={t('appShell.navAriaLabel')}
+            className="flex items-center gap-4 text-sm"
+          >
             <NavLink
               to="/"
               end
@@ -32,14 +39,25 @@ export default function AppShell() {
                 )
               }
             >
-              Dashboard
+              {t('appShell.nav.dashboard')}
+            </NavLink>
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                cn(
+                  'transition-colors',
+                  isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )
+              }
+            >
+              {t('appShell.nav.settings')}
             </NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
             {user && (
               <span
-                aria-label={`Signed in as ${user.username}`}
+                aria-label={t('appShell.signedInAs', { username: user.username })}
                 className="bg-muted flex size-7 items-center justify-center rounded-full text-xs font-medium"
               >
                 {user.username.slice(0, 1).toUpperCase()}
@@ -47,7 +65,7 @@ export default function AppShell() {
             )}
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut />
-              Sign out
+              {t('appShell.signOut')}
             </Button>
           </div>
         </div>

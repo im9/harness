@@ -7,11 +7,13 @@ import Watchlist from '@/components/dashboard/Watchlist'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ChatContext } from '@/lib/chat-client'
 import type { Timeframe } from '@/lib/dashboard-types'
+import { useTranslation } from '@/lib/i18n'
 import { useDashboard } from '@/lib/use-dashboard'
 
 const DEFAULT_TIMEFRAME: Timeframe = '10s'
 
 export default function Dashboard() {
+  const { t } = useTranslation()
   // Per-symbol timeframe selection. The map is preserved across swaps
   // so each instrument remembers its last-chosen cadence (ADR 004 §Swap
   // mechanics). Undefined entries fall back to DEFAULT_TIMEFRAME on the
@@ -59,7 +61,7 @@ export default function Dashboard() {
     return (
       <div
         role="status"
-        aria-label="Loading dashboard"
+        aria-label={t('dashboard.loading')}
         className="flex flex-col gap-6"
       >
         <Skeleton className="h-16 w-full" />
@@ -71,7 +73,9 @@ export default function Dashboard() {
   if (!data) {
     return (
       <div role="alert" className="text-rose-600 dark:text-rose-400 text-sm">
-        Failed to load dashboard: {error?.message ?? 'unknown error'}
+        {t('dashboard.error.fetch', {
+          message: error?.message ?? t('dashboard.error.fetch.unknown'),
+        })}
       </div>
     )
   }
@@ -97,7 +101,7 @@ export default function Dashboard() {
       <MarketsStrip markets={data.markets} />
       {error && (
         <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">
-          Stream error: {error.message} — showing last known snapshot
+          {t('dashboard.error.stream', { message: error.message })}
         </p>
       )}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">

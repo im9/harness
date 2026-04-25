@@ -43,15 +43,38 @@ Panels:
   or `local`).
 - **Notifications** — browser Notification toggle + webhook URL for
   `ENTER` / `RETREAT` pushes.
-- **Localization** — display timezone (default `Asia/Tokyo`, the
-  constant currently hardcoded in `lib/display-timezone.ts`). When
-  the panel lands it replaces the constant with a DB-backed value;
-  the chart's `tickMarkFormatter` + `localization.timeFormatter` and
-  the NewsFeed row's exact time both read through the same module
-  and get the update for free. Language / locale for UI chrome may
-  layer in later but is out of scope for the initial panel (the UI
-  copy is English-only today and harness is single-user, so
-  priority is low).
+- **Localization** — two fields:
+  1. **Display timezone** (default `Asia/Tokyo`, the constant
+     currently hardcoded in `lib/display-timezone.ts`). When the
+     panel lands it replaces the constant with a DB-backed value;
+     the chart's `tickMarkFormatter` + `localization.timeFormatter`
+     and the NewsFeed row's exact time both read through the same
+     module and get the update for free.
+  2. **UI language** (`'ja' | 'en'`, default `'ja'`). The operator
+     is a Japanese trader; surfacing UI chrome in their first
+     language removes a small but constant friction during heavy
+     reading. Pairs with ADR 010's bilingual terminology entries —
+     toggling the UI language gives a paired JA↔EN learning path
+     alongside Help UI lookups.
+
+  **Translation policy** (resolved during Phase A). Translate UI
+  chrome — nav / form labels / headings / descriptions / errors /
+  validation / aria-labels / empty states / status messages.
+  Keep verbatim:
+  - product name (`harness`)
+  - state markers in the four-state engine (`ENTER` / `HOLD` /
+    `EXIT` / `RETREAT`) — universal one-word signals
+  - timeframe abbreviations (`10s` `1m` `5m` `15m` `1H` `1D` `1W`)
+  - market / region codes (`PT` `ET` `GMT/BST` `JST`) and IANA
+    zone names (`America/New_York` etc.)
+  - theme tokens (`light` / `dark`)
+  - DB-stored content (ticker symbols, news titles, operator notes)
+
+  Domain terms: `Watchlist` / `News` / `Markets` /
+  `setup range` / `macro event window` use katakana
+  (`ウォッチリスト` etc.); `target` / `retreat` (lowercase,
+  in descriptive text — distinct from the `RETREAT` state marker)
+  translate to `目標` / `撤退`.
 
 ### Schema-driven forms
 
@@ -102,21 +125,63 @@ CLI YAML import (above) or direct DB edits.
 
 ## Implementation
 
-- [ ] Backend: Pydantic config schema (instruments, sessions, rule,
-      setup library, macro, providers, notifications, localization).
-- [ ] Backend: config persistence in SQLite + migration story.
-- [ ] Backend: `GET /api/settings`, `PUT /api/settings`,
+Staged so the backbone (schema layer, persistence, settings API,
+`/settings` route) lands first behind the smallest user-visible
+panel — Localization. Subsequent panels arrive alongside their
+backing ADRs (Rule / Setup / Macro with ADR 007; four Provider
+panels with ADR 008) and don't have to rebuild the foundation.
+
+### Phase A — Localization slice (foundation + first panel)
+
+- [x] Backend: `app_config` single-row JSON table in SQLite; future
+      panels extend the JSON shape rather than adding tables.
+- [x] Backend: Pydantic config schema seeded with `localization`
+      (`displayTimezone: string`, default `"Asia/Tokyo"`),
+      designed to grow as panels land.
+- [x] Backend: `GET /api/settings`, `PUT /api/settings`
+      (full-document replace; per-panel partial PATCH deferred until
+      multi-panel concurrency becomes a concern).
+- [x] Frontend (on ADR 003 scaffold): `/settings` route with the
+      Localization panel. Schema-driven form pattern (zod mirror of
+      Pydantic) is established here so later panels plug in without
+      re-deciding shape.
+- [x] Frontend: settings loaded once at app boot into a context;
+      `lib/display-timezone.ts` reads the operator's value through
+      that context (fallback `Asia/Tokyo` for first run / API
+      failure). Chart `tickMarkFormatter` /
+      `localization.timeFormatter` and NewsFeed exact time pick up
+      the change without further edits.
+- [x] Backend: extend `LocalizationConfig` with `language: 'ja' |
+      'en'` (default `'ja'`).
+- [x] Frontend: `lib/i18n/` module — `messages-en.ts` +
+      `messages-ja.ts` typed dictionaries; `useTranslation()` hook
+      reads `useSettings().settings.localization.language` and
+      returns a `t(key)` function. Keep dictionary keys in sync via
+      TypeScript (JA dict typed `Record<MessageKey, string>` so a
+      missing key is a build error).
+- [x] Frontend: migrate visible UI chrome through `t()` per the
+      translation policy above. State markers / timeframe
+      abbreviations / product name / theme tokens / market codes
+      stay verbatim; domain terms use katakana.
+- [x] Frontend: Localization panel adds **Language** field
+      (`select` between Japanese / English) alongside Display
+      timezone.
+
+### Phase B — remaining panels (deferred)
+
+Land alongside the ADRs that own the underlying config:
+
+- [ ] Sessions / Notifications panels (independent — no upstream
+      dependency, can land any time after Phase A).
+- [ ] Rule overlay / Setup library / Macro overlay panels —
+      arrive with ADR 007 backend engine.
+- [ ] Market-data / Event-calendar / News / AI chat provider
+      panels — arrive with ADR 008 backend providers, including
       per-provider "test connection" endpoints.
-- [ ] Frontend (on ADR 003 scaffold): `/settings` — schema-driven
-      forms per section (zod mirror of Pydantic), test-connection
-      feedback, persist on save.
-- [ ] Frontend: **Localization** panel wired to
-      `lib/display-timezone.ts` — replaces the `Asia/Tokyo`
-      constant with a DB-backed value so chart axis labels and
-      NewsFeed exact time pick up the operator's preference.
 - [ ] CLI: `harness config export <yaml>` / `harness config import
-      <yaml>` — gitignored outputs, round-trip validated against
-      the Pydantic schemas.
+      <yaml>` — round-trips the full schema; defer until the
+      schema covers more than one panel (single-panel YAML is busy
+      work).
 
 ## Considerations
 

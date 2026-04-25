@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { flushSync } from 'react-dom'
+import { useTranslation } from '@/lib/i18n'
 import {
   makeUserTurn,
   streamChatReply,
@@ -47,6 +48,7 @@ export default function AiChatFloat({ context = null }: AiChatFloatProps = {}) {
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [draft, setDraft] = useState('')
   const [pending, setPending] = useState(false)
+  const { t } = useTranslation()
 
   const panelId = useId()
   const titleId = useId()
@@ -217,7 +219,7 @@ export default function AiChatFloat({ context = null }: AiChatFloatProps = {}) {
         ref={fabRef}
         type="button"
         hidden={open}
-        aria-label="Open AI chat"
+        aria-label={t('chat.open.aria')}
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen(true)}
@@ -238,12 +240,12 @@ export default function AiChatFloat({ context = null }: AiChatFloatProps = {}) {
       >
         <header className="border-border flex items-center justify-between border-b px-4 py-3">
           <h2 id={titleId} className="text-sm font-semibold tracking-wide">
-            AI chat
+            {t('chat.title')}
           </h2>
           <button
             type="button"
             onClick={close}
-            aria-label="Close AI chat"
+            aria-label={t('chat.close.aria')}
             className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 focus-visible:outline-none focus-visible:ring-2"
           >
             <MinimizeIcon />
@@ -252,15 +254,12 @@ export default function AiChatFloat({ context = null }: AiChatFloatProps = {}) {
         <div
           ref={transcriptRef}
           role="log"
-          aria-label="Transcript"
+          aria-label={t('chat.transcript.aria')}
           aria-live="polite"
           className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3"
         >
           {turns.length === 0 && !pending && (
-            <p className="text-muted-foreground text-xs">
-              Ask about the primary instrument, watchlist state, or the
-              current setup. Session-only — nothing is persisted.
-            </p>
+            <p className="text-muted-foreground text-xs">{t('chat.empty')}</p>
           )}
           {turns.map((turn) => (
             <TurnBubble key={turn.id} turn={turn} />
@@ -284,7 +283,7 @@ export default function AiChatFloat({ context = null }: AiChatFloatProps = {}) {
           className="border-border flex items-end gap-2 border-t px-3 py-3"
         >
           <label htmlFor={`${panelId}-composer`} className="sr-only">
-            Message
+            {t('chat.message.label')}
           </label>
           <textarea
             id={`${panelId}-composer`}
@@ -293,21 +292,21 @@ export default function AiChatFloat({ context = null }: AiChatFloatProps = {}) {
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleComposerKey}
             rows={2}
-            placeholder="Ask…"
-            aria-label="Message"
+            placeholder={t('chat.message.placeholder')}
+            aria-label={t('chat.message.label')}
             className="border-border bg-background focus-visible:ring-ring flex-1 resize-none rounded border px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2"
           />
           <button
             type="submit"
             disabled={pending || draft.trim().length === 0}
-            aria-label="Send message"
+            aria-label={t('chat.send.aria')}
             className={cn(
               'bg-primary text-primary-foreground cursor-pointer rounded px-3 py-1.5 text-sm font-medium',
               'hover:bg-primary/90 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2',
               'disabled:cursor-not-allowed disabled:opacity-50',
             )}
           >
-            Send
+            {t('chat.send')}
           </button>
         </form>
       </section>

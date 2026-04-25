@@ -11,14 +11,16 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type {
   IndicatorKind,
   InstrumentRowState,
   SetupRange,
   Timeframe,
 } from '@/lib/dashboard-types'
-import { DISPLAY_TIMEZONE, formatTimeOfDay } from '@/lib/display-timezone'
+import { formatTimeOfDay } from '@/lib/display-timezone'
+import { useTranslation } from '@/lib/i18n'
+import { useDisplayTimezone } from '@/lib/settings-context'
 import TimeframeSelector from './TimeframeSelector'
 
 interface PriceChartProps {
@@ -27,46 +29,64 @@ interface PriceChartProps {
   onTimeframeChange: (next: Timeframe) => void
 }
 
-// Pre-built Intl formatters for non-Time tick types. Re-using the
-// instances avoids per-tick allocation churn during chart panning.
-// All zones pin to DISPLAY_TIMEZONE so axis labels read in JST
-// regardless of the operator's browser TZ (ADR 004 (i.3)).
-const YEAR_FORMATTER = new Intl.DateTimeFormat('en-GB', {
-  timeZone: DISPLAY_TIMEZONE,
-  year: 'numeric',
-})
-const MONTH_FORMATTER = new Intl.DateTimeFormat('en-GB', {
-  timeZone: DISPLAY_TIMEZONE,
-  month: 'short',
-  year: 'numeric',
-})
-const DAY_FORMATTER = new Intl.DateTimeFormat('en-GB', {
-  timeZone: DISPLAY_TIMEZONE,
-  month: 'short',
-  day: '2-digit',
-})
-const TIME_WITH_SECONDS_FORMATTER = new Intl.DateTimeFormat('en-GB', {
-  timeZone: DISPLAY_TIMEZONE,
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23',
-})
+// Tick-mark formatters for non-Time scales (year/month/day/time-with-
+// seconds). Re-using formatter instances avoids per-tick allocation
+// churn during chart panning. The bundle is keyed by timezone so a
+// settings change rebuilds only the formatters once, not per tick.
+// ADR 009 Phase A makes the operator's reading frame configurable;
+// before that this was a module-level constant pinned to JST.
+interface TickFormatters {
+  year: Intl.DateTimeFormat
+  month: Intl.DateTimeFormat
+  day: Intl.DateTimeFormat
+  timeWithSeconds: Intl.DateTimeFormat
+}
 
-function formatTickMarkInDisplayTz(timeSec: number, tickType: number): string {
+function buildTickFormatters(timezone: string): TickFormatters {
+  return {
+    year: new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      year: 'numeric',
+    }),
+    month: new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      month: 'short',
+      year: 'numeric',
+    }),
+    day: new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      month: 'short',
+      day: '2-digit',
+    }),
+    timeWithSeconds: new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }),
+  }
+}
+
+function formatTickMark(
+  timeSec: number,
+  tickType: number,
+  timezone: string,
+  formatters: TickFormatters,
+): string {
   const date = new Date(timeSec * 1000)
   switch (tickType) {
     case 0:
-      return YEAR_FORMATTER.format(date)
+      return formatters.year.format(date)
     case 1:
-      return MONTH_FORMATTER.format(date)
+      return formatters.month.format(date)
     case 2:
-      return DAY_FORMATTER.format(date)
+      return formatters.day.format(date)
     case 4:
-      return TIME_WITH_SECONDS_FORMATTER.format(date)
+      return formatters.timeWithSeconds.format(date)
     case 3:
     default:
-      return formatTimeOfDay(timeSec)
+      return formatTimeOfDay(timeSec, timezone)
   }
 }
 
@@ -231,6 +251,14 @@ export default function PriceChart({
   const lastSymbolRef = useRef<string | null>(null)
   const hasBars = row.bars.length > 0
 
+  const timezone = useDisplayTimezone()
+  const { t } = useTranslation()
+  // Memoize the per-zone formatter bundle so a tz change rebuilds the
+  // four DateTimeFormat instances exactly once. The bundle is a closed
+  // dependency of the chart-create effect, which restarts on tz change
+  // so axis ticks pick up the new reading frame without a remount.
+  const tickFormatters = useMemo(() => buildTickFormatters(timezone), [timezone])
+
   // Create the chart once per mount (re-creation only if `height` or
   // `hasBars` changes). Streaming payload updates do not rebuild the
   // chart — they flow through the separate effect below. This split
@@ -260,17 +288,19 @@ export default function PriceChart({
         borderVisible: false,
         timeVisible: true,
         secondsVisible: false,
-        // Render axis tick labels in JST so chart times agree with
-        // chat HH:MM references (which resolve via display-timezone).
-        // tickMarkType values from lightweight-charts are 0=Year,
-        // 1=Month, 2=DayOfMonth, 3=Time, 4=TimeWithSeconds.
+        // Render axis tick labels in the operator's reading frame so
+        // chart times agree with chat HH:MM references (which resolve
+        // via display-timezone). tickMarkType values from
+        // lightweight-charts are 0=Year, 1=Month, 2=DayOfMonth,
+        // 3=Time, 4=TimeWithSeconds.
         tickMarkFormatter: (time: Time, tickType: number) =>
-          formatTickMarkInDisplayTz(time as number, tickType),
+          formatTickMark(time as number, tickType, timezone, tickFormatters),
       },
-      // Crosshair tooltip's time field also reads in JST so the
-      // hover label matches the axis ticks at the same x-coordinate.
+      // Crosshair tooltip's time field also reads in the operator's
+      // zone so the hover label matches the axis ticks at the same
+      // x-coordinate.
       localization: {
-        timeFormatter: (time: Time) => formatTimeOfDay(time as number),
+        timeFormatter: (time: Time) => formatTimeOfDay(time as number, timezone),
       },
       crosshair: { mode: 1 },
     })
@@ -353,7 +383,7 @@ export default function PriceChart({
       priceLines.length = 0
       markersRef.current = null
     }
-  }, [hasBars])
+  }, [hasBars, timezone, tickFormatters])
 
   // Apply the payload to the live chart. Runs on mount (right after
   // the chart is created) and on every row change delivered by the
@@ -431,7 +461,7 @@ export default function PriceChart({
           lineWidth: 1,
           lineStyle: 2,
           axisLabelVisible: true,
-          title: `target · ${row.setup.target.label}`,
+          title: t('chart.target.title', { label: row.setup.target.label }),
         }),
       )
       priceLinesRef.current.push(
@@ -441,7 +471,7 @@ export default function PriceChart({
           lineWidth: 1,
           lineStyle: 2,
           axisLabelVisible: true,
-          title: `retreat · ${row.setup.retreat.label}`,
+          title: t('chart.retreat.title', { label: row.setup.retreat.label }),
         }),
       )
     }
@@ -494,7 +524,9 @@ export default function PriceChart({
       setupRangeMidlineRef.current,
       setupRangeRef.current,
     )
-  }, [row])
+    // `t` is in deps because price-line titles read translated copy;
+    // a language change rebuilds them so the axis labels follow.
+  }, [row, t])
 
   if (!hasBars) {
     return (
@@ -504,10 +536,10 @@ export default function PriceChart({
         </div>
         <div
           role="status"
-          aria-label={`${row.instrument.displayName} price chart`}
+          aria-label={t('chart.aria', { name: row.instrument.displayName })}
           className="border-border bg-muted/10 text-muted-foreground flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed text-xs"
         >
-          No price data
+          {t('chart.noData')}
         </div>
       </div>
     )
@@ -525,7 +557,7 @@ export default function PriceChart({
       <div className="border-border bg-card/40 relative min-h-0 flex-1 overflow-hidden rounded-md border">
         <div
           ref={containerRef}
-          aria-label={`${row.instrument.displayName} price chart`}
+          aria-label={t('chart.aria', { name: row.instrument.displayName })}
           role="img"
           className="h-full w-full"
         />
@@ -533,14 +565,16 @@ export default function PriceChart({
           <>
             <div
               ref={setupRangeBandRef}
-              aria-label={`setup range · ${row.setup.setupName}`}
+              aria-label={t('chart.setupRange.aria', { name: row.setup.setupName })}
               className="pointer-events-none absolute inset-x-0 border-y border-indigo-400/40 bg-indigo-400/10"
               style={{ top: 0, height: 0 }}
             />
             {row.setup.setupRange.midline && (
               <div
                 ref={setupRangeMidlineRef}
-                aria-label={`setup range midline · ${row.setup.setupRange.midline.label}`}
+                aria-label={t('chart.setupRangeMidline.aria', {
+                  label: row.setup.setupRange.midline.label,
+                })}
                 className="pointer-events-none absolute inset-x-0 border-t border-dashed border-indigo-400/70"
                 style={{ top: 0, height: 0 }}
               />
@@ -550,7 +584,7 @@ export default function PriceChart({
         {row.macro && (
           <div
             ref={macroBandRef}
-            aria-label={`macro event window · ${row.macro.eventName}`}
+            aria-label={t('chart.macroBand.aria', { name: row.macro.eventName })}
             className="pointer-events-none absolute inset-y-0 border-x border-amber-500/40 bg-amber-500/10"
             style={{ left: 0, width: 0 }}
           />

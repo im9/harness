@@ -74,3 +74,22 @@ class Notification(Base):
     payload: Mapped[str] = mapped_column(Text)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="pending")
+
+
+class AppConfig(Base):
+    """Single-row JSON document holding operator settings (ADR 009).
+
+    Phase A only carries `localization.displayTimezone`; the JSON shape
+    grows as more panels land (sessions / rule / setup library / macro /
+    providers / notifications). One row keeps the persistence story
+    boring: PUT is full-document replace, no per-panel partials, no
+    join logic.
+    """
+
+    __tablename__ = "app_config"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    data: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )

@@ -1,5 +1,6 @@
 import { CategoryBar } from '@/components/ui/category-bar'
 import type { RuleOverlayState } from '@/lib/dashboard-types'
+import { useTranslation } from '@/lib/i18n'
 
 interface RuleGaugeProps {
   rule: RuleOverlayState
@@ -28,6 +29,7 @@ function formatCurrency(amount: number, currency: string): string {
 }
 
 export default function RuleGauge({ rule }: RuleGaugeProps) {
+  const { t } = useTranslation()
   const pctRaw = rule.cap > 0 ? (rule.used / rule.cap) * 100 : 0
   const pct = Math.min(100, Math.max(0, Math.floor(pctRaw)))
 
@@ -35,11 +37,13 @@ export default function RuleGauge({ rule }: RuleGaugeProps) {
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between text-xs">
         <span className="text-muted-foreground uppercase tracking-wide">
-          Loss cap
+          {t('rule.lossCap.label')}
         </span>
         <span className="text-foreground tabular-nums">
-          {formatCurrency(rule.used, rule.quoteCurrency)} of{' '}
-          {formatCurrency(rule.cap, rule.quoteCurrency)}
+          {t('rule.lossCap.usage', {
+            used: formatCurrency(rule.used, rule.quoteCurrency),
+            cap: formatCurrency(rule.cap, rule.quoteCurrency),
+          })}
         </span>
       </div>
       <div
@@ -47,7 +51,7 @@ export default function RuleGauge({ rule }: RuleGaugeProps) {
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label="Daily loss cap usage"
+        aria-label={t('rule.lossCap.aria')}
       >
         <CategoryBar
           values={[...SEGMENTS]}
@@ -58,13 +62,17 @@ export default function RuleGauge({ rule }: RuleGaugeProps) {
       </div>
       {rule.capReached && (
         <p role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-400">
-          Cap reached — ENTER signals suppressed
+          {t('rule.capReached')}
         </p>
       )}
       {rule.cooldownActive && (
         <p className="text-xs text-muted-foreground">
-          Cooldown active
-          {rule.cooldownUntil ? ` until ${new Date(rule.cooldownUntil).toLocaleTimeString()}` : ''}
+          {t('rule.cooldown')}
+          {rule.cooldownUntil
+            ? t('rule.cooldown.until', {
+                time: new Date(rule.cooldownUntil).toLocaleTimeString(),
+              })
+            : ''}
         </p>
       )}
     </div>

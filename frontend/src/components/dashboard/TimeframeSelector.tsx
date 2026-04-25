@@ -1,4 +1,5 @@
 import { TIMEFRAMES, type Timeframe } from '@/lib/dashboard-types'
+import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 interface TimeframeSelectorProps {
@@ -20,10 +21,11 @@ const LABEL: Record<Timeframe, string> = {
 }
 
 export default function TimeframeSelector({ value, onChange }: TimeframeSelectorProps) {
+  const { t } = useTranslation()
   return (
     <div
       role="radiogroup"
-      aria-label="Timeframe"
+      aria-label={t('timeframe.aria')}
       className="border-border bg-muted/30 inline-flex items-center gap-0.5 rounded-md border p-0.5 text-xs"
     >
       {TIMEFRAMES.map((tf) => {

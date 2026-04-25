@@ -1,4 +1,5 @@
 import type { MarketIndex } from '@/lib/dashboard-types'
+import { useTranslation } from '@/lib/i18n'
 
 interface MarketsStripProps {
   markets: MarketIndex[]
@@ -30,9 +31,10 @@ function formatPctChange(value: number): string {
 // by the sign of pctChange so the operator's glance reads direction
 // first and precision second.
 export default function MarketsStrip({ markets }: MarketsStripProps) {
+  const { t } = useTranslation()
   return (
     <section
-      aria-label="Markets overview"
+      aria-label={t('markets.aria')}
       className="border-border bg-card/40 flex flex-wrap items-stretch gap-4 rounded-md border px-4 py-3"
     >
       {markets.map((index) => {

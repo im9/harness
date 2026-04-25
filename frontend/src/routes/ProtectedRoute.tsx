@@ -1,9 +1,11 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useTranslation } from '@/lib/i18n'
 import { useAuth } from '../auth-context'
 
 export default function ProtectedRoute() {
   const { status } = useAuth()
+  const { t } = useTranslation()
 
   if (status === 'loading') {
     // Centered skeleton bar with role="status" + accessible name so assistive
@@ -14,7 +16,7 @@ export default function ProtectedRoute() {
     return (
       <div
         role="status"
-        aria-label="Checking session"
+        aria-label={t('protectedRoute.loadingSession')}
         className="flex min-h-dvh items-center justify-center px-4"
       >
         <Skeleton className="h-8 w-48" />

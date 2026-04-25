@@ -24,27 +24,31 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { useTranslation } from '@/lib/i18n'
 
 const TOTP_LENGTH = 6
 
-const loginSchema = z.object({
-  username: z.string().trim().min(1, 'Enter your username'),
-  password: z.string().min(1, 'Enter your password'),
-  totpCode: z
-    .string()
-    .length(
-      TOTP_LENGTH,
-      `Enter the ${TOTP_LENGTH}-digit code from your authenticator app`,
-    )
-    .regex(/^\d+$/, 'Code must be digits only'),
-})
-
-type LoginFormValues = z.infer<typeof loginSchema>
-
+// The login form is rendered before the SettingsProvider mounts (it
+// gates auth), so the form's copy lives on whichever language the
+// `useTranslation` hook resolves to via fallback (ADR 009 default ja).
+// Once the operator authenticates and the Settings document loads,
+// post-login routes pick up the operator's chosen language.
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const [serverError, setServerError] = useState('')
+  const { t } = useTranslation()
+
+  const loginSchema = z.object({
+    username: z.string().trim().min(1, t('login.validation.username')),
+    password: z.string().min(1, t('login.validation.password')),
+    totpCode: z
+      .string()
+      .length(TOTP_LENGTH, t('login.validation.totp.length', { length: TOTP_LENGTH }))
+      .regex(/^\d+$/, t('login.validation.totp.digits')),
+  })
+
+  type LoginFormValues = z.infer<typeof loginSchema>
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -58,11 +62,11 @@ export default function Login() {
       navigate('/', { replace: true })
     } catch (e) {
       if (e instanceof LoginError && e.status === 401) {
-        setServerError('Invalid credentials')
+        setServerError(t('login.error.invalidCredentials'))
       } else if (e instanceof LoginError) {
-        setServerError(`Sign-in failed (HTTP ${e.status}): ${e.message}`)
+        setServerError(t('login.error.http', { status: e.status, detail: e.message }))
       } else {
-        setServerError('Sign-in failed: network error')
+        setServerError(t('login.error.network'))
       }
     }
   }
@@ -71,13 +75,13 @@ export default function Login() {
     <main className="flex min-h-dvh items-center justify-center px-4 py-8">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>harness</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+          <CardTitle>{t('login.cardTitle')}</CardTitle>
+          <CardDescription>{t('login.cardDescription')}</CardDescription>
         </CardHeader>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            aria-label="sign in"
+            aria-label={t('login.formAriaLabel')}
             noValidate
           >
             <CardContent className="flex flex-col gap-4">
@@ -86,7 +90,7 @@ export default function Login() {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>{t('login.username.label')}</FormLabel>
                     <FormControl>
                       <Input autoComplete="username" {...field} />
                     </FormControl>
@@ -99,7 +103,7 @@ export default function Login() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t('login.password.label')}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -116,7 +120,7 @@ export default function Login() {
                 name="totpCode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Authenticator code</FormLabel>
+                    <FormLabel>{t('login.totp.label')}</FormLabel>
                     <FormControl>
                       <Input
                         inputMode="numeric"
@@ -134,8 +138,7 @@ export default function Login() {
                       />
                     </FormControl>
                     <FormDescription>
-                      {TOTP_LENGTH}-digit code from your authenticator app (not
-                      the setup secret).
+                      {t('login.totp.description', { length: TOTP_LENGTH })}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -153,7 +156,7 @@ export default function Login() {
                 disabled={form.formState.isSubmitting}
                 className="w-full"
               >
-                Sign in
+                {t('login.submit')}
               </Button>
             </CardFooter>
           </form>

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ImpactTier, NewsItem } from '@/lib/dashboard-types'
 import { formatTimeOfDay } from '@/lib/display-timezone'
+import { useTranslation } from '@/lib/i18n'
+import { useDisplayTimezone } from '@/lib/settings-context'
 import { formatRelativeTime } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
 
@@ -59,6 +61,8 @@ export default function NewsFeed({ items, nowMs }: NewsFeedProps) {
     return () => clearInterval(id)
   }, [nowMs])
   const now = nowMs ?? tickedNow
+  const timezone = useDisplayTimezone()
+  const { t } = useTranslation()
 
   const [detailId, setDetailId] = useState<string | null>(null)
   // Detail view is derived from the current items — if the stored id
@@ -74,20 +78,26 @@ export default function NewsFeed({ items, nowMs }: NewsFeedProps) {
 
   return (
     <aside
-      aria-label="News"
+      aria-label={t('news.aria')}
       className="border-border bg-card/40 flex min-h-0 flex-1 flex-col rounded-lg border"
     >
       <h2 className="text-muted-foreground px-3 pt-3 pb-2 text-xs font-medium tracking-wide uppercase">
-        News
+        {t('news.title')}
       </h2>
       {detailItem ? (
         <NewsDetailView
           item={detailItem}
           now={now}
+          timezone={timezone}
           onBack={() => setDetailId(null)}
         />
       ) : (
-        <NewsListView items={items} now={now} onOpen={setDetailId} />
+        <NewsListView
+          items={items}
+          now={now}
+          timezone={timezone}
+          onOpen={setDetailId}
+        />
       )}
     </aside>
   )
@@ -96,22 +106,25 @@ export default function NewsFeed({ items, nowMs }: NewsFeedProps) {
 function NewsListView({
   items,
   now,
+  timezone,
   onOpen,
 }: {
   items: NewsItem[]
   now: number
+  timezone: string
   onOpen: (id: string) => void
 }) {
+  const { t } = useTranslation()
   return (
     <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1 pb-1">
       {items.map((item) => (
         <li key={item.id}>
-          <NewsRow item={item} now={now} onOpen={onOpen} />
+          <NewsRow item={item} now={now} timezone={timezone} onOpen={onOpen} />
         </li>
       ))}
       {items.length === 0 && (
         <li className="text-muted-foreground px-2 py-3 text-xs">
-          No headlines
+          {t('news.empty')}
         </li>
       )}
     </ul>
@@ -121,14 +134,19 @@ function NewsListView({
 function NewsRow({
   item,
   now,
+  timezone,
   onOpen,
 }: {
   item: NewsItem
   now: number
+  timezone: string
   onOpen: (id: string) => void
 }) {
   const hasDetail = Boolean(item.source || item.body || item.url)
-  const exactTime = formatTimeOfDay(Math.floor(Date.parse(item.at) / 1000))
+  const exactTime = formatTimeOfDay(
+    Math.floor(Date.parse(item.at) / 1000),
+    timezone,
+  )
   const relative = formatRelativeTime(item.at, now)
 
   const body = (
@@ -174,13 +192,19 @@ function NewsRow({
 function NewsDetailView({
   item,
   now,
+  timezone,
   onBack,
 }: {
   item: NewsItem
   now: number
+  timezone: string
   onBack: () => void
 }) {
-  const exactTime = formatTimeOfDay(Math.floor(Date.parse(item.at) / 1000))
+  const { t } = useTranslation()
+  const exactTime = formatTimeOfDay(
+    Math.floor(Date.parse(item.at) / 1000),
+    timezone,
+  )
   const relative = formatRelativeTime(item.at, now)
   const backRef = useRef<HTMLButtonElement>(null)
 
@@ -208,7 +232,7 @@ function NewsDetailView({
 
   return (
     <section
-      aria-label="News detail"
+      aria-label={t('news.detail.aria')}
       className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-3"
     >
       <button
@@ -220,7 +244,7 @@ function NewsDetailView({
           'focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2',
         )}
       >
-        <span aria-hidden>←</span> Back to news
+        <span aria-hidden>←</span> {t('news.detail.back')}
       </button>
       <div className="flex items-center gap-2 text-[11px]">
         <span
@@ -258,7 +282,7 @@ function NewsDetailView({
           rel="noopener noreferrer"
           className="text-sm text-sky-600 hover:underline dark:text-sky-400"
         >
-          Read full article →
+          {t('news.detail.readFull')} <span aria-hidden>→</span>
         </a>
       )}
     </section>
