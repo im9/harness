@@ -125,12 +125,8 @@ async def save_help_entries(
             await session.execute(select(HelpEntry).where(HelpEntry.slug == entry.slug))
         ).scalar_one_or_none()
         tags_json = json.dumps(entry.tags)
-        aliases_en_json = (
-            json.dumps(entry.aliases_en) if entry.aliases_en is not None else None
-        )
-        aliases_ja_json = (
-            json.dumps(entry.aliases_ja) if entry.aliases_ja is not None else None
-        )
+        aliases_en_json = json.dumps(entry.aliases_en) if entry.aliases_en is not None else None
+        aliases_ja_json = json.dumps(entry.aliases_ja) if entry.aliases_ja is not None else None
         if row is None:
             session.add(
                 HelpEntry(

@@ -37,8 +37,7 @@ async def import_help_yaml(session: AsyncSession, path: Path) -> int:
         return 0
     if not isinstance(parsed, list):
         raise ValueError(
-            "help-entries YAML must be a list at the top level "
-            "(each entry prefixed with '- ')."
+            "help-entries YAML must be a list at the top level (each entry prefixed with '- ')."
         )
 
     entries: list[HelpEntryDocument] = []

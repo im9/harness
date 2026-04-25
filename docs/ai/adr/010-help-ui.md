@@ -204,6 +204,13 @@ above. Candidate directions to explore later:
       ADR 009's config YAML import pattern).
 - [ ] Follow-on ADR (or amendment) for in-app editor surface.
 - [ ] Follow-on ADR for dashboard cross-links into help entries.
+- [ ] Author "usage" content entries (dashboard surfaces, swap
+      mechanics, rule overlay, chat context, settings) under the
+      `usage` tag umbrella + per-surface tags. Deferred because the
+      underlying features (rule engine, providers, chat tool-use)
+      aren't fully shipped yet — usage docs would churn ahead of
+      the surfaces they describe. Schema is already in place; this
+      is content-only when the time comes.
 
 ## Related ADRs
 

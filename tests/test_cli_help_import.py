@@ -71,9 +71,7 @@ async def test_import_creates_rows(tmp_path: Path, session: AsyncSession) -> Non
 # ---------- idempotency ----------
 
 
-async def test_import_is_idempotent_via_slug_upsert(
-    tmp_path: Path, session: AsyncSession
-) -> None:
+async def test_import_is_idempotent_via_slug_upsert(tmp_path: Path, session: AsyncSession) -> None:
     # Re-running the same import must not duplicate rows. Slug is the
     # stable upsert key (Phase 1 Decision Q1).
     yaml_path = _write_yaml(
