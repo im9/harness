@@ -54,6 +54,7 @@ export const en = {
   'appShell.navAriaLabel': 'Primary',
   'appShell.nav.dashboard': 'Dashboard',
   'appShell.nav.settings': 'Settings',
+  'appShell.nav.help': 'Help',
   'appShell.signOut': 'Sign out',
   'appShell.signedInAs': 'Signed in as {username}',
 
@@ -132,6 +133,22 @@ export const en = {
   // (`target`, `retreat`) translate.
   'state.target': 'target',
   'state.retreat': 'retreat',
+
+  // ---------- Help routes (ADR 010) ----------
+  'help.title': 'Help',
+  'help.subtitle': 'Reference for chart, securities, and analysis terminology.',
+  'help.search.aria': 'Search help entries',
+  'help.search.placeholder': 'Search…',
+  'help.tag.filterAria': 'Filter by tag',
+  'help.entry.tags': 'Tags',
+  'help.empty.noMatches': 'No entries match the current filters.',
+  'help.empty.noEntries':
+    'No help entries yet.\nSeed via `harness help-import config/help-entries.yaml`.',
+  'help.detail.aria': 'Help entry detail',
+  'help.detail.back': 'Back to help',
+  'help.detail.loading': 'Loading entry…',
+  'help.detail.notFound': 'Help entry not found.',
+  'help.detail.error': 'Failed to load entry: {message}',
 
   // ---------- AiChatFloat ----------
   'chat.title': 'AI chat',

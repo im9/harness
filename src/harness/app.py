@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 
 from harness.auth.routes import router as auth_router
+from harness.help import router as help_router
 from harness.settings import router as settings_router
 
 app = FastAPI(title="harness")
 app.include_router(auth_router)
 app.include_router(settings_router)
+app.include_router(help_router)
 
 
 @app.get("/health")

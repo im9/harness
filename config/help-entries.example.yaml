@@ -1,0 +1,132 @@
+# Help-entries seed (ADR 010 Phase 1).
+#
+# Generic terminology only — operator-specific notes (personal
+# setups, specific market observations) belong in the gitignored
+# `config/help-entries.yaml`, never here. See ADR 001 advisory rule:
+# entries are descriptive, not prescriptive ("VWAP is …" not "buy
+# when price reclaims VWAP").
+#
+# Schema (Phase 1 Decision Q1, bilingual):
+#   - slug:      URL-safe stable key. The CLI upserts by slug; renaming
+#                this string is effectively delete + re-add.
+#   - title_en / title_ja: display name in each language (both required).
+#   - tags:      neutral keys (no language). The frontend renders
+#                display labels via i18n dict (`help.tag.{key}`).
+#                Reuse existing keys — adding a new tag requires a
+#                paired entry in `messages-en.ts` and `messages-ja.ts`.
+#   - body_en / body_ja: markdown rendered client-side via react-
+#                markdown. Both required.
+#   - aliases_en / aliases_ja: optional. Searchable as if they were
+#                titles in the corresponding language.
+#
+# Usage:
+#   $ harness help-import config/help-entries.yaml
+
+- slug: vwap
+  title_en: Volume Weighted Average Price
+  title_ja: 出来高加重平均価格
+  tags: [chart, indicator]
+  aliases_en: [VWAP]
+  aliases_ja: [VWAP, ブイダブリュー]
+  body_en: |
+    A reference line plotting the day's average traded price weighted
+    by volume at each price level. Resets at the open of each session.
+
+    Operators often watch VWAP as a mean-revert anchor or as a
+    directional pivot — price persistently above VWAP indicates
+    aggressive buy pressure for the session; below, aggressive sell.
+  body_ja: |
+    その日の出来高で加重された平均約定価格をプロットする基準線。
+    各セッションの寄付でリセットされる。
+
+    VWAP は平均回帰のアンカー、もしくは方向性の支点として観察される
+    ことが多い。価格が VWAP を持続的に上回るならそのセッションの買い
+    圧力が強く、下回るなら売り圧力が強いと解釈される。
+
+- slug: bid-ask-spread
+  title_en: Bid/Ask Spread
+  title_ja: ビッド・アスクスプレッド
+  tags: [securities, microstructure]
+  aliases_en: [spread, quote spread]
+  aliases_ja: [スプレッド, 気配スプレッド]
+  body_en: |
+    The difference between the best bid (highest price a buyer will
+    pay) and the best ask (lowest price a seller will accept).
+
+    Tighter spreads indicate higher liquidity and lower implicit
+    transaction cost; widening spreads often precede or accompany
+    increased volatility or thinning order books.
+  body_ja: |
+    最良ビッド（買い手が払う最高価格）と最良アスク（売り手が受ける
+    最低価格）の差。
+
+    スプレッドが狭いほど流動性が高く実質的な取引コストが低い。
+    スプレッドが広がるとボラティリティ上昇や板の薄さの先行・併発
+    シグナルとなることが多い。
+
+- slug: opening-range-break
+  title_en: Opening Range Break
+  title_ja: オープニングレンジブレイク
+  tags: [setup, intraday]
+  aliases_en: [ORB, opening range breakout]
+  aliases_ja: [ORB, 寄付レンジブレイク]
+  body_en: |
+    A pattern where price exits the high–low range established
+    during the first N minutes of a session (commonly 5, 15, or 30).
+
+    Used as a momentum cue: a clean break with rising volume suggests
+    the session's directional bias has resolved; a failed break
+    (return to range) often signals a range-bound day instead.
+  body_ja: |
+    セッション最初の N 分（5 分・15 分・30 分が一般的）に形成された
+    高安レンジを抜ける動き。
+
+    モメンタムの手がかりとして使われる。出来高を伴う明確なブレイクは
+    その日の方向性が決まった可能性を示し、ブレイク失敗（レンジ内への
+    回帰）はレンジ相場の継続を示唆する。
+
+- slug: gap-fill
+  title_en: Gap Fill
+  title_ja: ギャップフィル
+  tags: [chart, intraday]
+  aliases_en: [filling the gap]
+  aliases_ja: [窓埋め]
+  body_en: |
+    Price returning to and trading through the prior session's close
+    after opening at a gap (above or below). The unfilled gap area
+    can act as a magnet, especially in equities.
+
+    Whether a gap "wants to fill" is conditional on news catalyst,
+    overnight volume, and pre-market positioning; not all gaps fill,
+    and the rate at which they do varies by instrument.
+  body_ja: |
+    寄付でギャップ（上窓・下窓）が空いた後、価格が前日終値まで戻り
+    そこを通過する動き。未埋めのギャップ領域は磁石のように機能する
+    ことがあり、特に株式市場で顕著。
+
+    ギャップが埋まるかどうかはニュース材料、夜間出来高、寄付前の
+    ポジションによって変わる。すべてのギャップが埋まるわけではなく、
+    埋まる確率は銘柄によって異なる。
+
+- slug: volume-node
+  title_en: Volume Node
+  title_ja: ボリュームノード
+  tags: [chart, structure]
+  aliases_en: [HVN, LVN, volume profile node]
+  aliases_ja: [HVN, LVN, ボリュームプロファイルノード]
+  body_en: |
+    A price level (or narrow band) where significant trading volume
+    has accumulated, identifiable on a volume profile.
+
+    High Volume Nodes (HVN) often act as support/resistance because
+    they represent prices where many positions were established.
+    Low Volume Nodes (LVN) tend to see fast traversal — price moves
+    through them quickly when crossed.
+  body_ja: |
+    出来高プロファイル上で大きな出来高が蓄積している価格水準
+    （または狭い帯域）。
+
+    High Volume Node (HVN) は多くのポジションが建てられた価格を
+    示すため、サポート／レジスタンスとして機能することが多い。
+    Low Volume Node (LVN) は通過が速くなる傾向があり、価格が
+    抜けると一気に動くことが多い。

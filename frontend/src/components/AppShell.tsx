@@ -52,6 +52,17 @@ export default function AppShell() {
             >
               {t('appShell.nav.settings')}
             </NavLink>
+            <NavLink
+              to="/help"
+              className={({ isActive }) =>
+                cn(
+                  'transition-colors',
+                  isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )
+              }
+            >
+              {t('appShell.nav.help')}
+            </NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />

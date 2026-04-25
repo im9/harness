@@ -4,6 +4,8 @@ import AppShell from './components/AppShell'
 import ErrorBoundary from './components/ErrorBoundary'
 import { SettingsProvider } from './lib/settings-provider'
 import Dashboard from './routes/Dashboard'
+import Help from './routes/Help'
+import HelpDetail from './routes/HelpDetail'
 import Login from './routes/Login'
 import NotFound from './routes/NotFound'
 import ProtectedRoute from './routes/ProtectedRoute'
@@ -25,6 +27,8 @@ export default function App() {
             >
               <Route path="/" element={<Dashboard />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/help" element={<Help />} />
+              <Route path="/help/:slug" element={<HelpDetail />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Route>

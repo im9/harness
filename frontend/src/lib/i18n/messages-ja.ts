@@ -53,6 +53,7 @@ export const ja: Record<MessageKey, string> = {
   'appShell.navAriaLabel': 'メインナビゲーション',
   'appShell.nav.dashboard': 'ダッシュボード',
   'appShell.nav.settings': '設定',
+  'appShell.nav.help': 'ヘルプ',
   'appShell.signOut': 'サインアウト',
   'appShell.signedInAs': '{username} としてサインイン中',
 
@@ -129,6 +130,22 @@ export const ja: Record<MessageKey, string> = {
   // 小文字の補助語のみ翻訳。
   'state.target': '目標',
   'state.retreat': '撤退',
+
+  // ---------- Help routes (ADR 010) ----------
+  'help.title': 'ヘルプ',
+  'help.subtitle': 'チャート・証券・分析用語のリファレンス。',
+  'help.search.aria': 'ヘルプ項目を検索',
+  'help.search.placeholder': '検索…',
+  'help.tag.filterAria': 'タグで絞り込み',
+  'help.entry.tags': 'タグ',
+  'help.empty.noMatches': '該当する項目がありません。',
+  'help.empty.noEntries':
+    'ヘルプ項目がまだありません。\n`harness help-import config/help-entries.yaml` でインポートしてください。',
+  'help.detail.aria': 'ヘルプ項目詳細',
+  'help.detail.back': 'ヘルプ一覧へ戻る',
+  'help.detail.loading': '項目を読み込み中…',
+  'help.detail.notFound': 'ヘルプ項目が見つかりません。',
+  'help.detail.error': '項目の読み込みに失敗しました: {message}',
 
   // ---------- AiChatFloat ----------
   'chat.title': 'AI チャット',

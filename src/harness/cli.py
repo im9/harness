@@ -11,6 +11,7 @@ import asyncio
 import getpass
 import os
 import sys
+from pathlib import Path
 
 from harness import models  # noqa: F401  # register models on Base.metadata
 from harness.auth.init import (
@@ -19,6 +20,7 @@ from harness.auth.init import (
     init_auth,
 )
 from harness.db import Base, async_session_maker, engine
+from harness.help_import import import_help_yaml
 
 
 async def _ensure_schema() -> None:
@@ -63,6 +65,24 @@ async def _cmd_init_auth(args: argparse.Namespace) -> int:
     return 0
 
 
+async def _cmd_help_import(args: argparse.Namespace) -> int:
+    await _ensure_schema()
+
+    path = Path(args.path)
+    try:
+        async with async_session_maker() as session:
+            count = await import_help_yaml(session, path)
+    except FileNotFoundError:
+        print(f"File not found: {path}", file=sys.stderr)
+        return 2
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    print(f"Imported {count} help entries from {path}.")
+    return 0
+
+
 def _cmd_dev(args: argparse.Namespace) -> int:
     # Imported lazily so `harness --help` and `harness init-auth` don't pay
     # the uvicorn import cost.
@@ -94,6 +114,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Run the FastAPI dev server with autoreload (reads HOST/PORT from env).",
     )
     dev.set_defaults(func=_cmd_dev)
+
+    help_import = subs.add_parser(
+        "help-import",
+        help="Upsert help entries from a YAML file (ADR 010 — idempotent by slug).",
+    )
+    help_import.add_argument(
+        "path",
+        help="Path to the YAML file (e.g. config/help-entries.yaml).",
+    )
+    help_import.set_defaults(func=_cmd_help_import)
 
     args = parser.parse_args(argv)
     if asyncio.iscoroutinefunction(args.func):

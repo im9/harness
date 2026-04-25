@@ -78,6 +78,84 @@ None of the above is load-bearing — the point is to force the
 design questions above into concrete answers by shipping a thin
 slice, not to commit to this shape.
 
+## Phase 1 Decision
+
+After a first-pass spike (drawer + `?` shortcut + single-language
+body) was reviewed, the open questions resolve as follows. The
+ADR remains `Proposed` overall — Phase 1 ships browse + search +
+seed; the in-app editor and dashboard cross-links stay open for a
+follow-on ADR.
+
+**Q1 (content model).** Single `HelpEntry` row, **bilingual fields**:
+`id` (auto), `slug` (UNIQUE — stable seed key + URL handle),
+`title_en`, `title_ja`, `tags: list[str]` (TEXT JSON, neutral keys
+shared across languages — see Q5), `body_en`, `body_ja` (markdown
+both), `aliases_en: list[str] | None`, `aliases_ja: list[str] | None`
+(TEXT JSON), `created_at`, `updated_at`. The frontend selects the
+field pair matching `useTranslation()`'s active language; chrome and
+content are localized through the same switch.
+
+**Q3 (delivery surface).** **Dedicated route, not a drawer.** Two
+routes under `ProtectedRoute`:
+- `/help` — list with search box + tag pills + entry list
+- `/help/:slug` — detail with rendered markdown + back link to `/help`
+
+The route surface gives shareable URLs (Phase 2 chart-label →
+`/help/vwap` cross-links land as plain `<Link>`s) and avoids the
+drawer's coexistence-with-chat z-stacking concerns. **Discoverable
+affordance:** a "Help / ヘルプ" link in the AppShell header nav
+alongside Dashboard / Settings — first-class operator surface, not
+a hidden keyboard shortcut. **No `?` keybind Phase 1**: power-user
+shortcuts come back in a separate ADR if needed; conventional web
+discoverability comes first.
+
+**Q4 (dashboard integration).** Zero cross-links Phase 1 — same as
+the drawer-era decision. The route surface makes future cross-links
+trivial (`<Link to={`/help/${slug}`} />`), so deferring is cheap.
+
+**Q5 (search / browse).** Both, client-side, **in the active language**.
+The list page fetches the full corpus once via `GET /api/help`, then
+filters in-memory: title substring matches against `title_{lang}`,
+alias substring matches against `aliases_{lang}`. Tags filter exact-
+match against the neutral tag key. Server-side `?tag=` and `?q=`
+parameters exist on the API for future paging but the page does not
+use them in Phase 1. **Tag display labels** are translated through
+the i18n dictionary (`help.tag.{key}` → "Chart" / "チャート"); unknown
+tag keys fall back to the raw key so adding a new tag never hard-
+breaks the UI.
+
+**Q6 (persistence).** New `help_entries` SQLite table. Schema auto-
+creates via `Base.metadata.create_all` (no Alembic). Editing through
+a CLI subcommand `harness help-import <yaml>` only — in-app editor
+deferred. Idempotent upsert by slug.
+
+**Q2 (sourcing) and Q7 (privacy).** Resolved by a YAML split:
+`config/help-entries.example.yaml` ships in the public tree with
+generic terminology only (descriptive phrasing per ADR 001 advisory
+rule); `config/help-entries.yaml` is gitignored for the operator's
+personal study notes.
+
+### Deferred-but-documented tradeoffs
+
+Phase 1 choices that are deliberate, not oversights. Documented so
+future readers don't relitigate them as bugs:
+
+- **Tags as TEXT JSON with neutral keys + i18n display labels.** The
+  alternative (`tags_en` / `tags_ja` per row) duplicates the tag
+  identity across languages — a renamed translation would require
+  schema-level dedup logic. Neutral keys keep tag identity stable;
+  `help.tag.{key}` in the i18n dict carries the localized label.
+  New tags require a dict entry; absence falls back to the raw key
+  visibly so the gap surfaces at review.
+- **No `?` keyboard shortcut.** Adding a discoverability button (the
+  AppShell link) without also pinning a shortcut is the conventional
+  web pattern (Settings, Dashboard nav links don't have shortcuts
+  either). A power-user shortcut sheet (`Cmd+K` palette etc.) is a
+  separate concern that lives in its own ADR.
+- **Single-user auth scope.** All `/api/help` routes gate on
+  `Depends(current_user)` like the rest of the API; no per-row
+  `user_id`. Single-operator deployment per ADR 001.
+
 ## Considerations
 
 **Not a broker feature.** Help content describes general market
@@ -116,14 +194,16 @@ above. Candidate directions to explore later:
 
 ## Implementation
 
-- [ ] Resolve the open questions above through a first-slice spike.
-- [ ] Draft a follow-on ADR amendment (or a focused sibling ADR)
+- [x] Resolve the open questions above through a first-slice spike.
+- [x] Draft a follow-on ADR amendment (or a focused sibling ADR)
       pinning the chosen content model + surface once the spike
-      settles.
-- [ ] Implement the chosen slice (table, API, route / drawer,
-      search / browse).
-- [ ] CLI seed import for initial content bootstrap (parallel to
+      settles. (Done: `## Phase 1 Decision` section above.)
+- [x] Implement the chosen slice (table, API, route, search /
+      browse, AppShell discoverability link, bilingual content).
+- [x] CLI seed import for initial content bootstrap (parallel to
       ADR 009's config YAML import pattern).
+- [ ] Follow-on ADR (or amendment) for in-app editor surface.
+- [ ] Follow-on ADR for dashboard cross-links into help entries.
 
 ## Related ADRs
 

@@ -11,6 +11,12 @@
 // supplied vars map. Unknown placeholders are left intact (visible
 // in the rendered string) so a missing var surfaces at review
 // time rather than silently emptying out.
+//
+// `tTag` (ADR 010): help-entry tags are stored as language-neutral
+// keys (`chart`, `indicator`, …) and translated to display labels
+// here rather than being duplicated as bilingual columns. Unknown
+// tag keys fall back to the raw key so adding a new tag is never
+// hard-broken — the UI surfaces the gap visibly.
 
 import { useCallback, useContext } from 'react'
 import { en, type MessageKey } from './messages-en'
@@ -23,6 +29,27 @@ export type { MessageKey }
 const dictionaries: Record<Language, Record<MessageKey, string>> = {
   en,
   ja,
+}
+
+const TAG_LABELS: Record<Language, Record<string, string>> = {
+  en: {
+    chart: 'Chart',
+    indicator: 'Indicator',
+    securities: 'Securities',
+    microstructure: 'Microstructure',
+    setup: 'Setup',
+    intraday: 'Intraday',
+    structure: 'Structure',
+  },
+  ja: {
+    chart: 'チャート',
+    indicator: 'インジケーター',
+    securities: '証券',
+    microstructure: 'マーケットマイクロストラクチャ',
+    setup: 'セットアップ',
+    intraday: '日中',
+    structure: '構造',
+  },
 }
 
 // Fallback language when no SettingsProvider is mounted (test renders
@@ -63,5 +90,10 @@ export function useTranslation() {
     [dict],
   )
 
-  return { t, language }
+  const tTag = useCallback(
+    (tag: string): string => TAG_LABELS[language][tag] ?? tag,
+    [language],
+  )
+
+  return { t, language, tTag }
 }
