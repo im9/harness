@@ -220,7 +220,7 @@ consumers don't move.
   (configuration boundary + Settings UI panel list declared there).
 - [ADR 003](archive/003-ui-foundations.md) — shadcn/ui + Tailwind +
   react-hook-form + zod foundations the forms build on.
-- [ADR 007](007-backend-engine.md) — Trend engine indicator
+- [ADR 007](archive/007-backend-engine.md) — Trend engine indicator
   config defaults; an indicator panel arrives in Future
   extensions when operator-editable defaults are needed.
 - [ADR 008](008-backend-providers.md) — Provider panels edit the

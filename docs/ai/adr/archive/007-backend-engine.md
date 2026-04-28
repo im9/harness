@@ -1,6 +1,6 @@
 # ADR 007: Backend Engine — Trend
 
-## Status: Proposed
+## Status: Implemented
 
 ## Context
 

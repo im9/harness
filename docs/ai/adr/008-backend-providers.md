@@ -172,7 +172,7 @@ patches.
 ## Related ADRs
 
 - [ADR 004](archive/004-mvp-scope.md) — Phase 1 MVP scope.
-- [ADR 007](007-backend-engine.md) — Trend engine consumes
+- [ADR 007](archive/007-backend-engine.md) — Trend engine consumes
   `MarketDataProvider`'s bar window.
 - [ADR 005](archive/005-dashboard-layout.md) — Dashboard layout
   (consumes the `GET /api/dashboard` + `WebSocket /ws/dashboard`

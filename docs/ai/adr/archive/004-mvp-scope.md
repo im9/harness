@@ -77,7 +77,7 @@ state above:
    headlines.
 
 Detailed design + implementation spec:
-[ADR 007](../007-backend-engine.md).
+[ADR 007](007-backend-engine.md).
 
 ### Provider abstractions (mock-first)
 
