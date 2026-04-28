@@ -9,15 +9,19 @@
 //
 // Auto-injected context (ADR 004 §AI chat) travels with every turn:
 // the operator's prompt is paired with a snapshot of the dashboard's
-// current primary / watchlist / markets / rule / news. The mock
+// current primary / watchlist / markets / trend / news. The mock
 // ignores the body, but the type contract is the load-bearing surface
 // for the real provider (which prompt-caches the snapshot server-side).
+//
+// `trend` replaced `rule` after ADR 007's 2026-04-25 narrowing —
+// the engine emits trend state, not rule-overlay state, so the chat
+// snapshot carries the trend that drove the dashboard's banner.
 
 import type {
   InstrumentRowState,
   MarketIndex,
   NewsItem,
-  RuleOverlayState,
+  TrendState,
   WatchlistItem,
 } from './dashboard-types'
 
@@ -35,7 +39,7 @@ export interface ChatTurn {
 
 // Per-turn snapshot of the dashboard state that travels alongside the
 // operator's prompt. Mirrors a structural subset of `DashboardPayload`
-// (with the `primary` / `rule` slots nullable for the loading frame).
+// (with the `primary` / `trend` slots nullable for the loading frame).
 // Defined here rather than re-exported from `dashboard-types.ts` so
 // the chat surface can evolve independently — e.g. add a
 // "selected-marker" slice for (i.3) without touching the dashboard
@@ -44,7 +48,7 @@ export interface ChatContext {
   primary: InstrumentRowState | null
   watchlist: WatchlistItem[]
   markets: MarketIndex[]
-  rule: RuleOverlayState | null
+  trend: TrendState | null
   news: NewsItem[]
 }
 

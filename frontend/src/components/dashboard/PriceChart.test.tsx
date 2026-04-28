@@ -10,13 +10,11 @@ import type { InstrumentRowState } from '@/lib/dashboard-types'
 const {
   setData,
   createPriceLine,
-  createSeriesMarkers,
   removeChart,
   addSeries,
 } = vi.hoisted(() => ({
   setData: vi.fn(),
   createPriceLine: vi.fn(),
-  createSeriesMarkers: vi.fn(),
   removeChart: vi.fn(),
   addSeries: vi.fn(),
 }))
@@ -46,10 +44,6 @@ vi.mock('lightweight-charts', () => ({
     applyOptions: vi.fn(),
     remove: removeChart,
   })),
-  createSeriesMarkers: (...args: unknown[]) => {
-    createSeriesMarkers(...args)
-    return { setMarkers: vi.fn(), detach: vi.fn() }
-  },
   CandlestickSeries: { __tag: 'Candlestick' },
   HistogramSeries: { __tag: 'Histogram' },
   LineSeries: { __tag: 'Line' },
@@ -67,7 +61,7 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
       tickValue: 5,
       quoteCurrency: 'USD',
     },
-    state: 'HOLD',
+    state: 'range',
     setup: {
       setupName: 'Opening range break',
       side: 'long',
@@ -92,7 +86,6 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
 beforeEach(() => {
   setData.mockClear()
   createPriceLine.mockClear()
-  createSeriesMarkers.mockClear()
   removeChart.mockClear()
   addSeries.mockClear()
 })
@@ -100,7 +93,6 @@ beforeEach(() => {
 afterEach(() => {
   setData.mockClear()
   createPriceLine.mockClear()
-  createSeriesMarkers.mockClear()
   removeChart.mockClear()
   addSeries.mockClear()
 })
@@ -144,18 +136,6 @@ describe('PriceChart', () => {
   it('does not draw price lines when no setup is active', () => {
     render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row({ setup: null })} />)
     expect(createPriceLine).not.toHaveBeenCalled()
-  })
-
-  it('places a trigger marker on the last bar when state is ENTER', () => {
-    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row({ state: 'ENTER' })} />)
-    // The marker cross-references the state banner — ENTER announcements
-    // and a visible chart arrow must land together to pass a glance test.
-    expect(createSeriesMarkers).toHaveBeenCalledTimes(1)
-  })
-
-  it('skips markers when the state does not warrant one', () => {
-    render(<PriceChart timeframe="10s" onTimeframeChange={() => {}} row={row({ state: 'HOLD' })} />)
-    expect(createSeriesMarkers).not.toHaveBeenCalled()
   })
 
   it('tears the chart down on unmount', () => {

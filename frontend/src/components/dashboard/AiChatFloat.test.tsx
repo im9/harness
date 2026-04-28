@@ -15,7 +15,7 @@ const EMPTY_CONTEXT: ChatContext = {
   primary: null,
   watchlist: [],
   markets: [],
-  rule: null,
+  trend: null,
   news: [],
 }
 
@@ -150,7 +150,7 @@ describe('AiChatFloat', () => {
 
   it('passes the current dashboard context to the provider on submit', async () => {
     // ADR 004 §AI chat: per-turn auto-inject of primary / watchlist /
-    // markets / rule / news. The component reads its `context` prop at
+    // markets / trend / news. The component reads its `context` prop at
     // submit time so the snapshot reflects whatever the dashboard is
     // showing in that frame, not the value at panel-open time.
     const spy = vi.spyOn(chatClient, 'streamChatReply')
@@ -180,7 +180,7 @@ describe('AiChatFloat', () => {
   it('ships the latest context snapshot at submit time, not the value at panel-open time', async () => {
     // The dashboard payload changes on every SSE tick. If the
     // component captured `context` at panel-open or first-render, the
-    // model would answer against stale primary / rule / news state.
+    // model would answer against stale primary / trend / news state.
     // Using a ref keeps the submit-time read live without churning
     // the submit callback identity on every parent render.
     const spy = vi.spyOn(chatClient, 'streamChatReply')

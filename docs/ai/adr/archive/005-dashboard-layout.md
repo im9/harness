@@ -312,8 +312,15 @@ the `ChatContext` projection change. Setup-specific chart
 annotations (target / retreat lines, setup range shading, setup
 trigger markers, macro event vertical band) are deferred along
 with the setup / rule / macro layers; they return when those
-layers do, as per-feature ADRs. The wire-format and frontend
-display transition lands alongside ADR 007's implementation slice.
+layers do, as per-feature ADRs.
+
+**2026-04-28 — Frontend wire-format swap done.** Banner state
+model + watchlist dot tone + chart trigger marker now follow
+the trend model; the setup-trigger arrow on ENTER was removed
+(setup detection deferred). `RuleGauge` + `RuleOverlayState`
+remain as standalone UI surfaces fed by the existing
+`data.rule` payload field — they revisit when the rule overlay
+ADR ships.
 
 ## Future extensions
 

@@ -37,7 +37,7 @@ function makePayload(tag: string): DashboardPayload {
         tickValue: 5,
         quoteCurrency: 'USD',
       },
-      state: 'HOLD',
+      state: 'range',
       setup: null,
       lastPrice: 0,
       lastPriceAt: '2026-04-23T09:45:00Z',

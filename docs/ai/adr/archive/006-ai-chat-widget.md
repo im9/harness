@@ -167,10 +167,15 @@ framing should steer the model toward descriptive phrasing.
 `ChatContext.rule` field is replaced by `ChatContext.trend`
 (`up` / `down` / `range`); the panel UX, FAB morph, streaming
 turn loop, and "chat stays chat" non-goal are unaffected. The
-wire-format transition lands alongside ADR 007's implementation
-slice. The "AI guardrail is structural" consideration carries
-over with the renamed field — trend state is computed upstream
-and the chat has no writable channel back into engine state.
+"AI guardrail is structural" consideration carries over with
+the renamed field — trend state is computed upstream and the
+chat has no writable channel back into engine state.
+
+**2026-04-28 — Wire-format swap done.** `ChatContext.rule:
+RuleOverlayState | null` replaced by `ChatContext.trend:
+TrendState | null`; `EMPTY_CONTEXT` and per-turn snapshot
+construction updated. Type contract aligned with ADR 007's
+backend `harness.engine.TrendState`.
 
 ## Future extensions
 

@@ -13,7 +13,7 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
       tickValue: 5,
       quoteCurrency: 'USD',
     },
-    state: 'HOLD',
+    state: 'range',
     setup: {
       setupName: 'Opening range break',
       side: 'long',
@@ -32,18 +32,18 @@ function row(overrides: Partial<InstrumentRowState> = {}): InstrumentRowState {
 }
 
 describe('StateBanner', () => {
-  it('announces the recommendation as a live status region', () => {
-    render(<StateBanner row={row({ state: 'ENTER' })} />)
+  it('announces the trend as a live status region', () => {
+    render(<StateBanner row={row({ state: 'up' })} />)
     // role=status is polite-live by default; screen readers announce
-    // banner content on state transitions (HOLD→ENTER, any→RETREAT) which
+    // banner content on trend transitions (range→up, any→down) which
     // is the primary a11y affordance called out in ADR 004 "motion and
     // notification".
     const status = screen.getByRole('status')
-    expect(status).toHaveTextContent(/ENTER/i)
+    expect(status).toHaveTextContent(/UP/i)
   })
 
   it('exposes the display name as the hero-level heading', () => {
-    render(<StateBanner row={row({ state: 'ENTER' })} />)
+    render(<StateBanner row={row({ state: 'up' })} />)
     // ADR 004 §State banner hierarchy: the hero line is the single
     // source of "what am I looking at" now that the active primary
     // is excluded from the watchlist. Promoting the display name to
@@ -56,7 +56,7 @@ describe('StateBanner', () => {
   })
 
   it('renders ticker and venue as the sub-line', () => {
-    render(<StateBanner row={row({ state: 'HOLD' })} />)
+    render(<StateBanner row={row({ state: 'range' })} />)
     // Sub-line disambiguates *which* market the instrument trades on.
     // Matters when the watchlist mixes asset classes across venues
     // (an "NKM" on OSE vs a ticker on another venue should never be
@@ -67,13 +67,13 @@ describe('StateBanner', () => {
   })
 
   it('surfaces the setup name and side when a setup is active', () => {
-    render(<StateBanner row={row({ state: 'HOLD' })} />)
+    render(<StateBanner row={row({ state: 'range' })} />)
     expect(screen.getByText(/opening range break/i)).toBeInTheDocument()
     expect(screen.getByText(/long/i)).toBeInTheDocument()
   })
 
   it('shows the target and retreat labels when a setup is active', () => {
-    render(<StateBanner row={row({ state: 'HOLD' })} />)
+    render(<StateBanner row={row({ state: 'range' })} />)
     // ADR 004 Visual language: target and retreat levels are labeled with
     // their R-multiple / role so the banner text alone conveys risk
     // context without requiring the chart.
@@ -82,21 +82,21 @@ describe('StateBanner', () => {
   })
 
   it('falls back to instrument-only display when no setup is active', () => {
-    render(<StateBanner row={row({ state: 'HOLD', setup: null })} />)
+    render(<StateBanner row={row({ state: 'range', setup: null })} />)
     expect(screen.getByText(/mock future a/i)).toBeInTheDocument()
     expect(screen.queryByText(/\+2R/)).not.toBeInTheDocument()
   })
 
   it('exposes the state via a data attribute so CSS can style transitions', () => {
     // Testing data-state rather than a specific color class lets the
-    // visual language (ADR 004: red for RETREAT, muted for HOLD, etc.)
-    // evolve without rewriting the test. The attribute is the stable
-    // contract between component and stylesheet.
+    // visual language (ADR 007: emerald for up, rose for down, muted
+    // for range) evolve without rewriting the test. The attribute is
+    // the stable contract between component and stylesheet.
     const { container, rerender } = render(
-      <StateBanner row={row({ state: 'ENTER' })} />,
+      <StateBanner row={row({ state: 'up' })} />,
     )
-    expect(container.querySelector('[data-state="enter"]')).not.toBeNull()
-    rerender(<StateBanner row={row({ state: 'RETREAT' })} />)
-    expect(container.querySelector('[data-state="retreat"]')).not.toBeNull()
+    expect(container.querySelector('[data-state="up"]')).not.toBeNull()
+    rerender(<StateBanner row={row({ state: 'down' })} />)
+    expect(container.querySelector('[data-state="down"]')).not.toBeNull()
   })
 })

@@ -92,10 +92,11 @@ top of this trend core when its data source materializes.
 - [x] Backend: extend `MarketDataProvider` with
       `.bars(symbol, timeframe, count)` for bar-window input
       (ADR 008 amendment).
-- [ ] Frontend: dashboard banner state model swap
+- [x] Frontend: dashboard banner state model swap
       (4 setup-trigger emissions → `TrendState`); ChatContext
-      `rule` field swap to `trend` (ADR 005 / 006 amendment
-      pending implementation slice).
+      `rule` field swap to `trend`. Watchlist dot tone follows
+      the trend palette (emerald/rose/zinc); chart ENTER trigger
+      marker removed (setup detection deferred).
 
 ## Future extensions
 

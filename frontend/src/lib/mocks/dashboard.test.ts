@@ -7,7 +7,9 @@ import {
   projectDashboard,
 } from './dashboard'
 
-const VALID_STATES = ['ENTER', 'HOLD', 'EXIT', 'RETREAT']
+// ADR 007 narrowed the banner state model: 4-state recommendation
+// (ENTER/HOLD/EXIT/RETREAT) → 3-state TrendState (up/down/range).
+const VALID_STATES = ['up', 'down', 'range']
 const VALID_IMPACTS = ['low', 'medium', 'high']
 
 describe('dashboard mocks', () => {
@@ -27,7 +29,7 @@ describe('dashboard mocks', () => {
     expect(dashboardUniverse.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('primary state is one of the four ADR-004 recommendation values', () => {
+  it('primary state is one of the three ADR-007 trend values', () => {
     expect(VALID_STATES).toContain(dashboardDefault.primary.state)
   })
 

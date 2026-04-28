@@ -41,18 +41,20 @@ export default function Dashboard() {
   }, [])
 
   // Per-turn snapshot for the AI chat (ADR 004 §AI chat: auto-injected
-  // primary / watchlist / markets / rule / news). Memoized on the
+  // primary / watchlist / markets / trend / news). Memoized on the
   // payload identity so the chat panel only sees a fresh reference
   // when the dashboard data actually changes — submit reads it via a
   // ref, but re-projecting on every render would still churn React
-  // diffing inside the panel for no reason.
+  // diffing inside the panel for no reason. `trend` mirrors the
+  // primary instrument's trend state (ADR 007 narrowed the chat
+  // snapshot from rule-overlay to trend-only — ADR 006 amendment).
   const chatContext = useMemo<ChatContext | null>(() => {
     if (!data) return null
     return {
       primary: data.primary,
       watchlist: data.watchlist,
       markets: data.markets,
-      rule: data.rule,
+      trend: data.primary.state,
       news: data.news,
     }
   }, [data])

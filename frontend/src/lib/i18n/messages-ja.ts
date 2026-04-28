@@ -126,7 +126,7 @@ export const ja: Record<MessageKey, string> = {
   'rule.cooldown.until': ' (〜 {time})',
 
   // ---------- StateBanner ----------
-  // ENTER / HOLD / EXIT / RETREAT (大文字のステートマーカー) はそのまま。
+  // UP / DOWN / RANGE (大文字のトレンドステートマーカー、ADR 007) はそのまま。
   // 小文字の補助語のみ翻訳。
   'state.target': '目標',
   'state.retreat': '撤退',

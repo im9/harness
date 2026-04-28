@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 //
 // Phase 1 streams text in / text out against the `echo` mock
 // ChatProvider (i.2). Each turn auto-injects the current dashboard
-// snapshot (primary / watchlist / markets / rule / news) per
+// snapshot (primary / watchlist / markets / trend / news) per
 // ADR 004 §AI chat — the chart-marker cross-link arrives in (i.3).
 
 interface AiChatFloatProps {
@@ -39,7 +39,7 @@ const EMPTY_CONTEXT: ChatContext = {
   primary: null,
   watchlist: [],
   markets: [],
-  rule: null,
+  trend: null,
   news: [],
 }
 

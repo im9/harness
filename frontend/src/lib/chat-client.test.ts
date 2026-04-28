@@ -12,7 +12,7 @@ const EMPTY_CONTEXT: ChatContext = {
   primary: null,
   watchlist: [],
   markets: [],
-  rule: null,
+  trend: null,
   news: [],
 }
 
@@ -81,24 +81,17 @@ describe('streamChatReply (echo mode)', () => {
 
   it('accepts a populated ChatContext snapshot per turn', async () => {
     // ADR 004 §AI chat: per-turn auto-inject of primary / watchlist /
-    // markets / rule / news. The mock echoes the prompt and ignores the
-    // context body — but the type contract is the load-bearing surface
-    // for the eventual real provider, so a populated snapshot must
-    // travel through the call without coercion.
+    // markets / trend / news. The mock echoes the prompt and ignores
+    // the context body — but the type contract is the load-bearing
+    // surface for the eventual real provider, so a populated snapshot
+    // must travel through the call without coercion.
     const ctx: ChatContext = {
       primary: null,
       watchlist: [],
       markets: [
         { ticker: 'N225', displayName: 'Nikkei 225', lastPrice: 38500, pctChange: 0.42 },
       ],
-      rule: {
-        used: 0,
-        cap: 30000,
-        capReached: false,
-        cooldownActive: false,
-        cooldownUntil: null,
-        quoteCurrency: 'JPY',
-      },
+      trend: 'up',
       news: [],
     }
     const chunks = await collect(streamChatReply('status?', ctx))

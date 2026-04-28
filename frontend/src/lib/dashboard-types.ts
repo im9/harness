@@ -6,7 +6,13 @@
 // wired up. The backend Pydantic models must stay structurally
 // compatible with these types.
 
-export type RecommendationState = 'ENTER' | 'HOLD' | 'EXIT' | 'RETREAT'
+// Trend state — one of three values produced by the trend engine
+// (ADR 007 narrowed 2026-04-25). Replaces the four setup-trigger
+// emissions that the earlier ADR 005 banner consumed; setup
+// detection / rule overlay / macro overlay are deferred to per-
+// feature ADRs. Wire-format strings match the backend's
+// `harness.engine.TrendState` so JSON round-trips structurally.
+export type TrendState = 'up' | 'down' | 'range'
 
 export type Side = 'long' | 'short'
 
@@ -126,7 +132,7 @@ export interface IndicatorLine {
 
 export interface InstrumentRowState {
   instrument: Instrument
-  state: RecommendationState
+  state: TrendState
   setup: SetupContext | null
   lastPrice: number
   lastPriceAt: string
@@ -150,7 +156,7 @@ export interface SparklinePoint {
 
 export interface WatchlistItem {
   instrument: Instrument
-  state: RecommendationState
+  state: TrendState
   lastPrice: number
   lastPriceAt: string
   // Percent change from the instrument's session anchor (per-instrument

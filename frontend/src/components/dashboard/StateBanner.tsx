@@ -1,41 +1,39 @@
-import type { InstrumentRowState, RecommendationState } from '@/lib/dashboard-types'
+import type { InstrumentRowState, TrendState } from '@/lib/dashboard-types'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 // Outer banner tone — kept subtle. The badge on the right carries the
-// state signal; the container is a soft accent, not a billboard.
-// RETREAT gets a slightly louder treatment because it's the "close
-// now" state the operator must notice even mid-conversation.
-const BANNER_TONE: Record<RecommendationState, string> = {
-  ENTER: 'border-emerald-500/30 bg-emerald-500/[0.04]',
-  HOLD: 'border-border bg-card/40',
-  EXIT: 'border-sky-500/30 bg-sky-500/[0.04]',
-  RETREAT: 'border-rose-500/50 bg-rose-500/10',
+// trend signal; the container is a soft accent, not a billboard.
+// `range` stays neutral so the operator's eye is drawn to directional
+// states.
+const BANNER_TONE: Record<TrendState, string> = {
+  up: 'border-emerald-500/30 bg-emerald-500/[0.04]',
+  down: 'border-rose-500/30 bg-rose-500/[0.04]',
+  range: 'border-border bg-card/40',
 }
 
 // Badge pill — saturated so it reads at a glance. Color carries the
-// state meaning; the label text is a redundant encoding for operators
-// with atypical color vision.
-const BADGE_TONE: Record<RecommendationState, string> = {
-  ENTER: 'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  HOLD: 'border-zinc-400/40 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300',
-  EXIT: 'border-sky-500/50 bg-sky-500/15 text-sky-700 dark:text-sky-300',
-  RETREAT:
-    'border-rose-500/60 bg-rose-500/20 text-rose-700 dark:text-rose-200',
+// trend direction; the uppercase label is a redundant encoding for
+// operators with atypical color vision.
+const BADGE_TONE: Record<TrendState, string> = {
+  up: 'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  down: 'border-rose-500/50 bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  range: 'border-zinc-400/40 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300',
 }
 
-const DOT_TONE: Record<RecommendationState, string> = {
-  ENTER: 'bg-emerald-500',
-  HOLD: 'bg-zinc-400',
-  EXIT: 'bg-sky-500',
-  RETREAT: 'bg-rose-500',
+const DOT_TONE: Record<TrendState, string> = {
+  up: 'bg-emerald-500',
+  down: 'bg-rose-500',
+  range: 'bg-zinc-400',
 }
 
-const STATE_LABEL: Record<RecommendationState, string> = {
-  ENTER: 'ENTER',
-  HOLD: 'HOLD',
-  EXIT: 'EXIT',
-  RETREAT: 'RETREAT',
+// Uppercase code labels per ADR 009 — wire-format strings stay
+// verbatim and the visible label is the same token uppercased,
+// matching how the prior recommendation states were displayed.
+const STATE_LABEL: Record<TrendState, string> = {
+  up: 'UP',
+  down: 'DOWN',
+  range: 'RANGE',
 }
 
 interface StateBannerProps {
@@ -57,7 +55,7 @@ export default function StateBanner({ row }: StateBannerProps) {
   return (
     <div
       role="status"
-      data-state={state.toLowerCase()}
+      data-state={state}
       className={cn(
         'flex flex-col gap-1 rounded-md border px-5 py-3',
         BANNER_TONE[state],

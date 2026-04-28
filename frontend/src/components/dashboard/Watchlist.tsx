@@ -1,4 +1,4 @@
-import type { RecommendationState, WatchlistItem } from '@/lib/dashboard-types'
+import type { TrendState, WatchlistItem } from '@/lib/dashboard-types'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import Sparkline from './Sparkline'
@@ -12,11 +12,10 @@ export interface WatchlistProps {
   onSwap: (symbol: string) => void
 }
 
-const DOT_TONE: Record<RecommendationState, string> = {
-  ENTER: 'bg-emerald-500',
-  HOLD: 'bg-zinc-400',
-  EXIT: 'bg-sky-500',
-  RETREAT: 'bg-rose-500',
+const DOT_TONE: Record<TrendState, string> = {
+  up: 'bg-emerald-500',
+  down: 'bg-rose-500',
+  range: 'bg-zinc-400',
 }
 
 function formatPctChange(value: number): string {
@@ -72,7 +71,7 @@ export default function Watchlist({ items, onSwap }: WatchlistProps) {
               <button
                 type="button"
                 onClick={() => onSwap(item.instrument.symbol)}
-                data-state={item.state.toLowerCase()}
+                data-state={item.state}
                 aria-label={t('watchlist.swap.aria', {
                   symbol: item.instrument.symbol,
                   name: item.instrument.displayName,

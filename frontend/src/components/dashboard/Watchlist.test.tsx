@@ -14,7 +14,7 @@ function makeItem(overrides: Partial<WatchlistItem> = {}): WatchlistItem {
       tickValue: 250,
       quoteCurrency: 'JPY',
     },
-    state: 'HOLD',
+    state: 'range',
     lastPrice: 2_812.5,
     lastPriceAt: '2026-04-24T01:00:00Z',
     pctChange: 0.28,
@@ -93,11 +93,11 @@ describe('Watchlist', () => {
     // against visual tweaks to the dot color.
     const { container } = render(
       <Watchlist
-        items={[makeItem({ state: 'ENTER' })]}
+        items={[makeItem({ state: 'up' })]}
         onSwap={() => {}}
       />,
     )
-    expect(container.querySelector('[data-state="enter"]')).not.toBeNull()
+    expect(container.querySelector('[data-state="up"]')).not.toBeNull()
   })
 
   it('renders an empty-state message when no items are tracked', () => {

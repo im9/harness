@@ -229,7 +229,7 @@ const NKM_MACRO: MacroEventWindow = {
 }
 const NKM_ROW: InstrumentRowState = {
   instrument: NKM_INSTRUMENT,
-  state: 'ENTER',
+  state: 'up',
   setup: NKM_SETUP,
   lastPrice: 38_515,
   lastPriceAt: END_ISO,
@@ -272,7 +272,7 @@ const TPXM_SETUP: SetupContext = {
 }
 const TPXM_ROW: InstrumentRowState = {
   instrument: TPXM_INSTRUMENT,
-  state: 'HOLD',
+  state: 'range',
   setup: TPXM_SETUP,
   lastPrice: 2_812.5,
   lastPriceAt: END_ISO,
@@ -320,7 +320,7 @@ const USDJPY_SETUP: SetupContext = {
 }
 const USDJPY_ROW: InstrumentRowState = {
   instrument: USDJPY_INSTRUMENT,
-  state: 'ENTER',
+  state: 'up',
   setup: USDJPY_SETUP,
   lastPrice: 155.418,
   lastPriceAt: END_ISO,
@@ -364,7 +364,7 @@ const ES_SETUP: SetupContext = {
 }
 const ES_ROW: InstrumentRowState = {
   instrument: ES_INSTRUMENT,
-  state: 'HOLD',
+  state: 'range',
   setup: ES_SETUP,
   lastPrice: 5_712.25,
   lastPriceAt: END_ISO,

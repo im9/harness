@@ -3,11 +3,9 @@ import {
   HistogramSeries,
   LineSeries,
   createChart,
-  createSeriesMarkers,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
-  type ISeriesMarkersPluginApi,
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts'
@@ -223,7 +221,6 @@ export default function PriceChart({
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const indicatorsRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map())
   const priceLinesRef = useRef<IPriceLine[]>([])
-  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const macroBandRef = useRef<HTMLDivElement>(null)
   // Captured seconds-since-epoch window, re-set on every row payload
   // so the visible-range subscriber (which fires on pan / zoom without
@@ -381,7 +378,6 @@ export default function PriceChart({
       volumeRef.current = null
       indicators.clear()
       priceLines.length = 0
-      markersRef.current = null
     }
   }, [hasBars, timezone, tickFormatters])
 
@@ -474,28 +470,6 @@ export default function PriceChart({
           title: t('chart.retreat.title', { label: row.setup.retreat.label }),
         }),
       )
-    }
-
-    // Trigger marker on the latest bar when state is ENTER. Reuse the
-    // marker plugin across updates so repeated ENTER snapshots don't
-    // stack plugins on the same series.
-    if (row.state === 'ENTER' && row.setup) {
-      const lastBar = row.bars[row.bars.length - 1]
-      const long = row.setup.side === 'long'
-      const marker = {
-        time: lastBar.time as UTCTimestamp,
-        position: (long ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
-        color: long ? COLOR_UP : COLOR_DOWN,
-        shape: (long ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
-        text: row.setup.setupName,
-      }
-      if (markersRef.current) {
-        markersRef.current.setMarkers([marker])
-      } else {
-        markersRef.current = createSeriesMarkers(candles, [marker])
-      }
-    } else {
-      markersRef.current?.setMarkers([])
     }
 
     const firstBarTime = row.bars[0]?.time ?? 0

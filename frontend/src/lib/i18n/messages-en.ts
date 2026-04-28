@@ -128,7 +128,7 @@ export const en = {
   'rule.cooldown.until': ' until {time}',
 
   // ---------- StateBanner ----------
-  // ENTER / HOLD / EXIT / RETREAT (uppercase state markers) stay
+  // UP / DOWN / RANGE (uppercase trend-state markers, ADR 007) stay
   // verbatim per ADR 009 policy. Only the lowercase descriptors
   // (`target`, `retreat`) translate.
   'state.target': 'target',
