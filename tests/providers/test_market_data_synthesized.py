@@ -11,6 +11,8 @@ than baked-in tick values, per CLAUDE.md "threshold justification" rule:
 
 from collections.abc import AsyncIterator
 
+import pytest
+
 from harness.providers.market_data import Bar, SessionCalendar, Tick
 from harness.providers.market_data_synthesized import SynthesizedMarketData
 
@@ -88,6 +90,103 @@ async def test_latest_bar_aggregates_recent_ticks():
 async def test_latest_bar_returns_none_before_any_subscribe():
     p = SynthesizedMarketData(seed=42)
     assert await p.latest_bar("AAPL") is None
+
+
+async def test_bars_returns_requested_count():
+    # Engine asks for `count` bars and expects exactly that many;
+    # synthesized generates them deterministically without depending
+    # on a running tick stream (decoupled from subscribe so engine TDD
+    # has a clean input).
+    p = SynthesizedMarketData(seed=42)
+    bars = await p.bars("AAPL", "1m", _SEQ_LEN)
+    assert len(bars) == _SEQ_LEN
+
+
+async def test_bars_is_deterministic_per_seed():
+    # ADR 008 determinism invariant — engine regressions reproduce
+    # offline because (seed, symbol, timeframe, count) → identical
+    # bars every call.
+    p1 = SynthesizedMarketData(seed=42)
+    p2 = SynthesizedMarketData(seed=42)
+    assert await p1.bars("AAPL", "1m", _SEQ_LEN) == await p2.bars("AAPL", "1m", _SEQ_LEN)
+
+
+async def test_bars_differs_across_seeds():
+    # Two distinct seeds with binary up/down per intra-bar step;
+    # collision probability falls off exponentially in the number of
+    # draws, so a flake here means seeds aren't actually mixed in.
+    p1 = SynthesizedMarketData(seed=42)
+    p2 = SynthesizedMarketData(seed=43)
+    assert await p1.bars("AAPL", "1m", _SEQ_LEN) != await p2.bars("AAPL", "1m", _SEQ_LEN)
+
+
+async def test_bars_differs_across_symbols_for_same_seed():
+    # Per-symbol RNG branching for bars (mirrors subscribe) — multi-
+    # symbol watchlist must show distinct walks.
+    p = SynthesizedMarketData(seed=42)
+    aapl = await p.bars("AAPL", "1m", _SEQ_LEN)
+    msft = await p.bars("MSFT", "1m", _SEQ_LEN)
+    assert [b.close for b in aapl] != [b.close for b in msft]
+
+
+async def test_bars_have_valid_ohlc_invariants():
+    # OHLC arithmetic invariants: low ≤ open/close ≤ high, and
+    # low ≤ high. These are definitional, not observed values —
+    # any bar that violates them would mis-feed the engine's range
+    # detection (ADR 007 — `range` state is the no-trend region).
+    p = SynthesizedMarketData(seed=42)
+    bars = await p.bars("AAPL", "1m", _SEQ_LEN)
+    for b in bars:
+        assert b.low <= b.open <= b.high
+        assert b.low <= b.close <= b.high
+        assert b.low <= b.high
+
+
+async def test_bars_timestamps_are_chronological():
+    # Engine linreg fits y = a·x + b over bar indices; if bars came
+    # back unordered the slope sign would be meaningless. "Most recent
+    # last" is part of the contract.
+    p = SynthesizedMarketData(seed=42)
+    bars = await p.bars("AAPL", "1m", _SEQ_LEN)
+    for i in range(1, len(bars)):
+        assert bars[i].timestamp > bars[i - 1].timestamp
+
+
+async def test_bars_timestamps_spaced_by_timeframe_interval():
+    # 1m timeframe means 60-second spacing between bar timestamps.
+    # Defined-by-spec interval, not observed — change the timeframe
+    # mapping and this test changes accordingly.
+    from datetime import timedelta
+
+    p = SynthesizedMarketData(seed=42)
+    bars = await p.bars("AAPL", "1m", _SEQ_LEN)
+    for i in range(1, len(bars)):
+        assert bars[i].timestamp - bars[i - 1].timestamp == timedelta(minutes=1)
+
+
+async def test_bars_carry_requested_timeframe_label():
+    p = SynthesizedMarketData(seed=42)
+    bars = await p.bars("AAPL", "5m", 3)
+    assert all(b.timeframe == "5m" for b in bars)
+
+
+async def test_bars_unknown_timeframe_raises():
+    # Fail-loud on unknown timeframe — operator config typo would
+    # otherwise silently fall through to a default and confuse the
+    # engine's window math.
+    p = SynthesizedMarketData(seed=42)
+    with pytest.raises(KeyError):
+        await p.bars("AAPL", "7q", 3)
+
+
+async def test_bars_is_stateless_across_calls():
+    # Decoupled from subscribe: calling bars() doesn't advance any
+    # state, and two consecutive calls with identical args return
+    # identical results.
+    p = SynthesizedMarketData(seed=42)
+    first = await p.bars("AAPL", "1m", _SEQ_LEN)
+    second = await p.bars("AAPL", "1m", _SEQ_LEN)
+    assert first == second
 
 
 async def test_session_calendar_returns_open_window_for_synthesized_mock():

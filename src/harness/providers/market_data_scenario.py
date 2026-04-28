@@ -85,6 +85,16 @@ class ScenarioMarketData:
     async def latest_bar(self, symbol: str, timeframe: str = "1m") -> Bar | None:
         return self._latest_bar.get(symbol)
 
+    async def bars(
+        self, symbol: str, timeframe: str = "1m", count: int = 20
+    ) -> tuple[Bar, ...]:
+        if symbol not in self._bars_by_symbol:
+            raise KeyError(f"symbol {symbol!r} not in scenario fixture")
+        # Authored sequences are by definition stateless: no advance,
+        # no mutation, no dependency on subscribe progress. Caller asks
+        # for the latest N; we return up to N from the tail.
+        return tuple(self._bars_by_symbol[symbol][-count:])
+
     async def session_calendar(self, market: str) -> SessionCalendar:
         return SessionCalendar(
             market=self._market,

@@ -136,6 +136,60 @@ async def test_two_providers_loaded_from_same_fixture_replay_identically():
     assert s1 == s2
 
 
+async def test_bars_returns_last_n_authored_bars_in_chronological_order():
+    # Scenario.bars is the trend-engine input surface (ADR 007 — pure
+    # `(bars, indicator_config) → TrendState`). For a fixture with 3
+    # authored bars, count=3 must return all three with timestamps
+    # increasing — engine linreg fits y=a·x+b over indices, so order
+    # is part of the contract.
+    p = ScenarioMarketData(_FIXTURE)
+    bars = await p.bars("AAPL", "1m", 3)
+    assert len(bars) == _AAPL_BAR_COUNT
+    assert [b.close for b in bars] == [
+        Decimal("100.20"),
+        Decimal("100.60"),
+        Decimal("101.00"),
+    ]
+    assert bars[0].timestamp < bars[1].timestamp < bars[2].timestamp
+
+
+async def test_bars_count_smaller_than_authored_returns_tail():
+    # Engine windowing: count=2 over a 3-bar fixture must return the
+    # *latest* 2, not the first 2 — "most recent N" is the contract.
+    p = ScenarioMarketData(_FIXTURE)
+    bars = await p.bars("AAPL", "1m", 2)
+    assert len(bars) == 2
+    assert [b.close for b in bars] == [Decimal("100.60"), Decimal("101.00")]
+
+
+async def test_bars_count_exceeding_authored_returns_all_available():
+    # Engine asks for a window larger than the fixture; provider
+    # returns what it has and lets the engine decide whether to fall
+    # back (e.g. min_confidence) — fewer-than-window is an engine
+    # concern, not a provider error.
+    p = ScenarioMarketData(_FIXTURE)
+    bars = await p.bars("AAPL", "1m", 100)
+    assert len(bars) == _AAPL_BAR_COUNT
+
+
+async def test_bars_unknown_symbol_raises():
+    # Same fail-loud pattern as subscribe — operator config bug.
+    p = ScenarioMarketData(_FIXTURE)
+    with pytest.raises(KeyError):
+        await p.bars("UNKNOWN", "1m", 10)
+
+
+async def test_bars_is_stateless_across_calls():
+    # No mutation, no advance — same fixture, same arguments must
+    # return identical bars every time. This is what makes scenario
+    # safe as an engine regression input (call once for assertion,
+    # call again for diagnostic, both see the same window).
+    p = ScenarioMarketData(_FIXTURE)
+    first = await p.bars("AAPL", "1m", 3)
+    second = await p.bars("AAPL", "1m", 3)
+    assert first == second
+
+
 async def test_session_calendar_uses_fixture_market_and_window():
     # Fixture declares JPX 09:00 / 15:00. Scenario serves the authored
     # calendar rather than synthesized's 24/7 stub so engine code that

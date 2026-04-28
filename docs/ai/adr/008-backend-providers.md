@@ -102,10 +102,12 @@ contract.
 - [x] `MarketDataProvider` mock: `scenario` (hand-authored
       sequences; YAML schema with deterministic-by-construction
       replay for trend-engine regression tests).
-- [ ] `MarketDataProvider`: extend with
+- [x] `MarketDataProvider`: extend with
       `.bars(symbol, timeframe, count)` for trend-engine input
       (current `latest_bar` returns one bar; the engine needs
-      a window).
+      a window). Stateless (no advance, no subscribe coupling);
+      scenario passthrough, synthesized deterministic per
+      `(seed, symbol, timeframe)` walk.
 - [ ] `NewsProvider` + registry + mock (`rss` polling public
       feeds via `feedparser`; ~5 minute cadence; cached
       in-memory; emits via the dashboard WS).
