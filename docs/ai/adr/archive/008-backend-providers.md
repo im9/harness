@@ -1,6 +1,6 @@
 # ADR 008: Backend Providers
 
-## Status: Proposed
+## Status: Implemented
 
 ## Context
 
@@ -108,14 +108,14 @@ contract.
       a window). Stateless (no advance, no subscribe coupling);
       scenario passthrough, synthesized deterministic per
       `(seed, symbol, timeframe)` walk.
-- [ ] `NewsProvider` + registry + mock (`rss` polling public
+- [x] `NewsProvider` + registry + mock (`rss` polling public
       feeds via `feedparser`; ~5 minute cadence; cached
       in-memory; emits via the dashboard WS).
-- [ ] `ChatProvider` + registry + mock (`echo`). `echo` already
+- [x] `ChatProvider` + registry + mock (`echo`). `echo` already
       fronted by the frontend mock client (`chat-client.ts`);
       the backend-side registry makes it available through the
       server when the chat endpoint lands.
-- [ ] `GET /api/dashboard` + `WebSocket /ws/dashboard` (primary
+- [x] `GET /api/dashboard` + `WebSocket /ws/dashboard` (primary
       + watchlist + news + trend state in a single payload, with
       `primarySymbol` parameterization).
 
@@ -171,13 +171,13 @@ patches.
 
 ## Related ADRs
 
-- [ADR 004](archive/004-mvp-scope.md) — Phase 1 MVP scope.
-- [ADR 007](archive/007-backend-engine.md) — Trend engine consumes
+- [ADR 004](004-mvp-scope.md) — Phase 1 MVP scope.
+- [ADR 007](007-backend-engine.md) — Trend engine consumes
   `MarketDataProvider`'s bar window.
-- [ADR 005](archive/005-dashboard-layout.md) — Dashboard layout
+- [ADR 005](005-dashboard-layout.md) — Dashboard layout
   (consumes the `GET /api/dashboard` + `WebSocket /ws/dashboard`
   aggregation).
-- [ADR 006](archive/006-ai-chat-widget.md) — AI chat widget
+- [ADR 006](006-ai-chat-widget.md) — AI chat widget
   (consumes `ChatProvider`'s `echo` mock).
-- [ADR 009](009-settings-ui.md) — Settings UI (edits the DB-
+- [ADR 009](../009-settings-ui.md) — Settings UI (edits the DB-
   backed provider selection config this registry dispatches on).
