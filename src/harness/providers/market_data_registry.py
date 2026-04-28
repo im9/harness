@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .market_data import MarketDataProvider
+from .market_data_scenario import ScenarioMarketData
 from .market_data_synthesized import SynthesizedMarketData
 
 ProviderFactory = Callable[..., MarketDataProvider]
@@ -33,4 +34,5 @@ class MarketDataRegistry:
 def default_market_data_registry() -> MarketDataRegistry:
     reg = MarketDataRegistry()
     reg.register("synthesized", SynthesizedMarketData)
+    reg.register("scenario", ScenarioMarketData)
     return reg

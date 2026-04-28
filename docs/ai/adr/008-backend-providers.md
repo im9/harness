@@ -99,8 +99,8 @@ contract.
       ring buffer.
 - [x] `MarketDataProvider` mock: `synthesized` (random walk,
       deterministic per `(seed, symbol)`).
-- [ ] `MarketDataProvider` mock: `scenario` (hand-authored
-      sequences; YAML schema with deterministic per-seed
+- [x] `MarketDataProvider` mock: `scenario` (hand-authored
+      sequences; YAML schema with deterministic-by-construction
       replay for trend-engine regression tests).
 - [ ] `MarketDataProvider`: extend with
       `.bars(symbol, timeframe, count)` for trend-engine input

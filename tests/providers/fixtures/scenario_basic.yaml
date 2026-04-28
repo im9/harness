@@ -1,0 +1,17 @@
+market: JPX
+trading_day: 2026-01-01
+session:
+  open: "09:00"
+  close: "15:00"
+symbols:
+  AAPL:
+    timeframe: 1m
+    bars:
+      - {timestamp: "2026-01-01T09:00:00+00:00", open: "100.00", high: "100.50", low: "99.80",  close: "100.20", volume: 1000}
+      - {timestamp: "2026-01-01T09:01:00+00:00", open: "100.20", high: "100.80", low: "100.10", close: "100.60", volume: 1200}
+      - {timestamp: "2026-01-01T09:02:00+00:00", open: "100.60", high: "101.20", low: "100.50", close: "101.00", volume: 1500}
+  MSFT:
+    timeframe: 1m
+    bars:
+      - {timestamp: "2026-01-01T09:00:00+00:00", open: "200.00", high: "200.30", low: "199.80", close: "200.10", volume: 800}
+      - {timestamp: "2026-01-01T09:01:00+00:00", open: "200.10", high: "200.40", low: "199.70", close: "199.90", volume: 900}
