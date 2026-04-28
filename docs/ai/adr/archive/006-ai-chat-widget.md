@@ -161,6 +161,17 @@ buy") as cheap insurance on top of the private-access model. This
 applies to the AI chat reply surface as well — system-prompt
 framing should steer the model toward descriptive phrasing.
 
+## Revisions
+
+**2026-04-25 — Trend pivot (ADR 007 revision).** The auto-injected
+`ChatContext.rule` field is replaced by `ChatContext.trend`
+(`up` / `down` / `range`); the panel UX, FAB morph, streaming
+turn loop, and "chat stays chat" non-goal are unaffected. The
+wire-format transition lands alongside ADR 007's implementation
+slice. The "AI guardrail is structural" consideration carries
+over with the renamed field — trend state is computed upstream
+and the chat has no writable channel back into engine state.
+
 ## Future extensions
 
 - **AI chat as a trigger surface** (Phase 2) — structured tool-use /

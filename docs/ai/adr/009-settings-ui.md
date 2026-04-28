@@ -25,24 +25,15 @@ Panels:
 
 - **Sessions** — operator's trading calendar (market hours,
   holidays, after-hours policy).
-- **Rule overlay** — daily loss cap, post-loss cooldown, override
-  policy (ADR 007).
-- **Setup library** — register / edit / remove named setups and
-  their parameters (threshold values, side, target / retreat
-  formulas). Does not cover per-instrument assignment — that's the
-  [future] Instrument management ADR.
-- **Macro overlay** — pre / event / post window durations, size
-  reduction for the post window, RETREAT tightening factors
-  (ADR 007).
 - **Market-data provider** — vendor / mock selection + connection
   parameters (ADR 008).
-- **Event-calendar provider** — vendor / mock selection + path or
-  endpoint.
-- **News provider** — vendor / mock selection.
-- **AI chat provider** — vendor / mock selection (currently `echo`
-  or `local`).
-- **Notifications** — browser Notification toggle + webhook URL for
-  `ENTER` / `RETREAT` pushes.
+- **News provider** — vendor / mock selection (Phase 1: `rss`
+  feed URL list + poll cadence).
+- **AI chat provider** — vendor / mock selection (Phase 1:
+  `echo`).
+- **Notifications** — browser Notification toggle + webhook URL
+  for significant trend transitions (e.g. `range` → `up` /
+  `down`).
 - **Localization** — two fields:
   1. **Display timezone** (default `Asia/Tokyo`, the constant
      currently hardcoded in `lib/display-timezone.ts`). When the
@@ -128,8 +119,8 @@ CLI YAML import (above) or direct DB edits.
 Staged so the backbone (schema layer, persistence, settings API,
 `/settings` route) lands first behind the smallest user-visible
 panel — Localization. Subsequent panels arrive alongside their
-backing ADRs (Rule / Setup / Macro with ADR 007; four Provider
-panels with ADR 008) and don't have to rebuild the foundation.
+backing ADRs (three Provider panels with ADR 008) and don't have
+to rebuild the foundation.
 
 ### Phase A — Localization slice (foundation + first panel)
 
@@ -173,11 +164,9 @@ Land alongside the ADRs that own the underlying config:
 
 - [ ] Sessions / Notifications panels (independent — no upstream
       dependency, can land any time after Phase A).
-- [ ] Rule overlay / Setup library / Macro overlay panels —
-      arrive with ADR 007 backend engine.
-- [ ] Market-data / Event-calendar / News / AI chat provider
-      panels — arrive with ADR 008 backend providers, including
-      per-provider "test connection" endpoints.
+- [ ] Market-data / News / AI chat provider panels — arrive
+      with ADR 008 backend providers, including per-provider
+      "test connection" endpoints.
 - [ ] CLI: `harness config export <yaml>` / `harness config import
       <yaml>` — round-trips the full schema; defer until the
       schema covers more than one panel (single-panel YAML is busy
@@ -205,15 +194,25 @@ consumers don't move.
 
 ## Future extensions
 
-- **Language / locale for UI chrome** — harness is English-only
-  today. Japanese UI chrome would benefit CJK operators but needs a
-  translation discipline + lint guard to keep in sync; low priority.
+- **Trend engine indicator panel** — `window`, `min_confidence`,
+  indicator selector (regression / SMA / EMA / etc.). Arrives
+  when the operator's defaults need to be edited from the UI;
+  Phase 1 ships indicator config as code defaults only.
+- **Rule overlay / Setup library / Macro overlay panels** —
+  return when their backing engine layers do, as per-feature
+  ADRs (deferred from Phase 1 by ADR 007 trend pivot
+  2026-04-25).
+- **Event-calendar provider panel** — returns when the
+  `EventCalendarProvider` does (ADR 008 Future extension).
+- **AI chat provider `local` mode field** — vendor-private LLM
+  endpoint URL / model selection. Lands when ADR 008's `local`
+  mock returns from Future extensions.
 - **Config versioning + migration** — when the Pydantic schema
-  evolves, loaded DB rows may need migration. Tackle when the first
-  breaking schema change arrives.
-- **Shared import for ops tooling** — the YAML export could feed a
-  sibling ops tool (e.g. a screen that diffs two operator configs)
-  if multi-user scenarios appear; not needed today.
+  evolves, loaded DB rows may need migration. Tackle when the
+  first breaking schema change arrives.
+- **Shared import for ops tooling** — the YAML export could
+  feed a sibling ops tool (e.g. a screen that diffs two operator
+  configs) if multi-user scenarios appear; not needed today.
 
 ## Related ADRs
 
@@ -221,10 +220,11 @@ consumers don't move.
   (configuration boundary + Settings UI panel list declared there).
 - [ADR 003](archive/003-ui-foundations.md) — shadcn/ui + Tailwind +
   react-hook-form + zod foundations the forms build on.
-- [ADR 007](007-backend-engine.md) — Rule overlay / Setup library /
-  Macro overlay panels edit the engine's config.
+- [ADR 007](007-backend-engine.md) — Trend engine indicator
+  config defaults; an indicator panel arrives in Future
+  extensions when operator-editable defaults are needed.
 - [ADR 008](008-backend-providers.md) — Provider panels edit the
-  registry's vendor/mock selection.
+  registry's vendor / mock selection.
 - [ADR 005](archive/005-dashboard-layout.md) — Localization panel
   replaces the dashboard's hardcoded JST timezone constant.
 - **[future] Instrument management ADR** — tracked instruments +

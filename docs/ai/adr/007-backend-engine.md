@@ -1,133 +1,141 @@
-# ADR 007: Backend Engine — Setup / Rule / Macro
+# ADR 007: Backend Engine — Trend
 
 ## Status: Proposed
 
 ## Context
 
-ADR 004 declared three engine layers at the topology level: a setup
-engine, a rule overlay, and a macro overlay, all feeding the four
-recommendation states (`ENTER` / `HOLD` / `EXIT` / `RETREAT`) that
-drive the dashboard (ADR 005), notifications, and the AI chat
-context (ADR 006). This ADR fills in what each layer looks like —
-the state machine shape, the rule semantics, the macro window
-effects — so the backend implementation can be built against a
-concrete spec.
+ADR 004's MVP scope (archived) sketched a three-layer engine —
+setup / rule / macro — at the topology level. The earlier draft of
+this ADR specified that whole topology as Phase 1 work. On audit
+(2026-04-25) two of the three layers turned out to lack a Phase 1
+data source and the third required operator-private definitions
+the public reference cannot ship:
+
+- **Rule overlay** triggers off losses, but harness has no order
+  visibility (advisory-only by ADR 004) and journaling is Phase 2
+  — the loss-cap and cooldown branches could never fire.
+- **Macro overlay** triggers off scheduled events, but the
+  EventCalendarProvider's only mock mode (`yaml`) requires
+  operator-authored calendars, and the manual-toggle UI surface
+  was never spec'd in the dashboard or settings ADRs.
+- **Setup engine** required operator-configured setups with
+  private threshold values (privacy rule keeps these out of the
+  tracked tree), so the public reference could ship only
+  "illustrative" setups.
+
+Phase 1 narrows to a single mechanical question: **what is the
+trend?** This has a clean input (bars), a clean output (one of
+three states), and depends on no trade visibility, no calendar
+source, and no operator-private setup definitions. Setups, rule
+overlay, and macro overlay become per-feature ADRs added later
+once their data sources exist.
 
 ## Decision
 
-### Setup engine
+### Trend engine
 
-Mechanical state machines per (instrument × setup), tick-driven,
-pure `(state, tick) → (state, emission)`. The setup library is
-operator-configured; the engine itself is setup-agnostic. A "setup"
-is a rule set for detecting and exiting a mechanical pattern (e.g.
-opening-range break, VWAP reclaim, trend-day continuation) — the
-engine runs whatever setups the operator registered, without
-baked-in knowledge of any specific pattern.
+Pure `(bars, indicator_config) → TrendState`. The engine itself
+holds no state across calls; it consumes a window of bars and
+returns one of:
 
-Emissions from the setup engine:
+- `up` — directional uptrend with sufficient confidence
+- `down` — directional downtrend with sufficient confidence
+- `range` — no clear directional signal (or low confidence)
 
-- `ENTER` — the setup has triggered and all conditions are
-  satisfied. Operator evaluates and places manually.
-- `HOLD` — in or near a setup, confirmation pending. Operator waits.
-- `EXIT` — target / take-profit level reached. Operator closes for
-  profit.
-- `RETREAT` — invalidation or stop hit. Operator closes at a loss.
+### Phase 1 indicator: linear regression on close prices
 
-### Rule overlay
+For each query, fit `y = a·x + b` over the most recent N bars'
+closes (`x = bar index`, `y = close`). Take `slope = a` and
+`R²` of the fit:
 
-Applied on top of the setup engine's emissions. Cap / cooldown /
-override semantics:
+- `up`    if `slope > 0` AND `R² ≥ min_confidence`
+- `down`  if `slope < 0` AND `R² ≥ min_confidence`
+- `range` otherwise (low confidence — no trend assertion)
 
-- **Daily loss cap.** When tripped, suppresses new `ENTER` emissions
-  (existing `HOLD` / `EXIT` / `RETREAT` pass through unchanged). The
-  operator still sees the underlying setup state in the dashboard,
-  just without the `ENTER` upgrade.
-- **Post-loss cooldown.** After a loss, new `ENTER` is suppressed
-  for a configured duration. Same pass-through rule as above.
-- **Explicit override.** Operator can manually lift a cap / cooldown
-  for a specific trade. Overrides are logged (Phase 2 journaling
-  consumes the log; Phase 1 has no persistence for it).
+Defaults: `window = 20` bars, `min_confidence = 0.5`. Both
+operator-configurable via ADR 009 Settings UI when the panel
+lands.
 
-**Advisory only.** harness does not see orders, so these are UI /
-notification effects, not enforcement. The operator remains free to
-trade in the broker client regardless; overrides are logged but not
-mechanically blocked at any layer.
+### Determinism
 
-### Macro overlay
-
-Applied after the rule overlay. Pre / event / post windows come from
-the `EventCalendarProvider` (ADR 008):
-
-- **Pre window** — suppress new `ENTER`, flag held positions as
-  `HOLD`, tighten `RETREAT` thresholds.
-- **Event window** — mute signals entirely (no `ENTER`, no `HOLD`
-  upgrade, `RETREAT` only if the underlying setup triggers one
-  independently).
-- **Post window** — reduced recommended size on new `ENTER`, tighter
-  `RETREAT`. The "reduced size" is advisory and surfaces in the
-  state banner + notification.
-
-One-click manual toggle for unscheduled headlines (e.g. a surprise
-central-bank comment) lets the operator flip the macro overlay on
-for a duration without editing the calendar.
-
-## Implementation
-
-- [ ] Backend: `SetupEngine` — starter setups as tick-driven pure
-      state machines. Starter library is illustrative, not the
-      operator's actual edge (see Considerations).
-- [ ] Backend: `RuleOverlay` — cap, cooldown, overrides. Logged but
-      not persisted in Phase 1.
-- [ ] Backend: `MacroOverlay` — event-window effects (pre / event /
-      post) + manual toggle for unscheduled headlines.
+Pure function: same `(bars, indicator_config)` → same
+`TrendState`. No wall-clock reads, no RNG, no shared mutable
+state. Replay-for-review becomes a straightforward add when
+tick / bar log persistence lands (Future extension).
 
 ## Considerations
 
-**Determinism.** Every recommendation must be reproducible from the
-tick log + rule state. No wall-clock reads in engine logic, no
-random tiebreaks, no mutable shared state. Since Phase 1 does not
-persist the tick log (ADR 004's persistence rule), this is an
-invariant on the engine's *shape*, not a historical audit trail —
-when tick-log persistence lands (Future extension), the engine's
-determinism makes replay-for-review a straightforward add.
+**Why linear regression over SMA crossover.** A single
+computation yields direction (slope sign) and confidence (R²)
+together; no separate signal is needed for the `range` state.
+SMA crossover oscillates near equilibrium and requires
+additional logic to declare a flat market.
 
-**Starter setup library is illustrative.** Phase 1 ships mechanically
-clear setups for ease of verification, not as the operator's edge.
-Expect replacement during live use; setup additions are
-configuration, not code, and should not require ADR revision.
+**Single indicator is sufficient for Phase 1.** Replacement is
+operator config, not code. Adding indicators (MACD, ADX, custom
+blends) does not require revising this ADR — register a new
+computer in the trend engine config.
 
-**Rule overlay is structural, not prompt-driven (AI-chat boundary).**
-Rule state is computed here, upstream of the chat request in ADR
-006. The chat's output channel is text back to the operator and has
-no writable path to mutate rule state. System-prompt framing is
-secondary defense.
+**No setup / rule / macro layers.** The original three-layer
+design required either trade visibility (rule), a defined event
+input (macro), or operator-private setup definitions, none of
+which Phase 1 has. Each becomes a per-feature ADR layered on
+top of this trend core when its data source materializes.
+
+## Implementation
+
+- [ ] Backend: `TrendEngine` — pure
+      `(bars, indicator_config) → TrendState`. Phase 1 indicator:
+      linear regression on close prices.
+- [ ] Backend: extend `MarketDataProvider` with
+      `.bars(symbol, timeframe, count)` for bar-window input
+      (ADR 008 amendment).
+- [ ] Frontend: dashboard banner state model swap
+      (4 setup-trigger emissions → `TrendState`); ChatContext
+      `rule` field swap to `trend` (ADR 005 / 006 amendment
+      pending implementation slice).
 
 ## Future extensions
 
-- **Tick / recommendation / rule-state log persistence** — enables
-  post-hoc analytics (hit rate, R distribution, rule effectiveness)
-  and a natural precursor to a review screen. Deferred past Phase 1
-  because without the UI surface, persisting the log has no
-  immediate consumer.
-- **Setup-library expansion** — additional setups as operator-
-  private configuration; generic setup *categories* (e.g. "breakout
-  family", "mean-revert family") may warrant their own ADR once the
-  categories stabilize.
-- **Backtest UI** — run the setup engine over historical ranges,
-  refine thresholds. Engine determinism above is the precondition.
-- **Setup-performance feedback loop** — surface the worst-performing
-  setup of the prior period and prompt for retune / retire. Depends
-  on journaling (Phase 2) + tick-log persistence.
+- **News-aware trend confidence (L1)** — when a news headline
+  lands within the last N minutes, force `range` (suppress
+  trend assertion during news fog). Cheap mechanical add — one
+  flag from the NewsProvider, no NLP. Lands as a separate ADR
+  once NewsProvider is in steady use.
+- **News impact classification (L2)** — distinguish
+  central-bank speech / rate decision / general headline via
+  rule-based or LLM classification, weight effects accordingly.
+  Independent ADR.
+- **Sentiment-driven trend bias (L3)** — positive news →
+  upward bias on trend confidence. Requires sentiment scoring
+  and an evaluation loop. Independent ADR.
+- **Setup detection layer** — pattern triggers (opening-range
+  break, VWAP reclaim, trend-day continuation, etc.) emitting
+  ENTER / EXIT signals on top of `TrendState`. Independent ADR.
+- **Rule overlay** — daily loss cap, post-loss cooldown,
+  override policy. Depends on trade journaling (independent
+  ADR).
+- **Macro overlay** — pre / event / post window effects.
+  Depends on `EventCalendarProvider` (currently dropped from
+  Phase 1 — see ADR 008).
+- **Multi-indicator blends** — composite reads with weighted
+  agreement across indicators (regression + ADX + volume
+  confirmation, etc.).
+- **Backtest UI** — replay engine over historical ranges to
+  refine thresholds. Engine determinism above is the
+  precondition.
+- **Tick / bar / state log persistence** — required for backtest
+  + post-hoc review.
 
 ## Related ADRs
 
-- [ADR 004](archive/004-mvp-scope.md) — Phase 1 MVP scope (this ADR
-  realizes the engine layers declared there).
-- [ADR 008](008-backend-providers.md) — Provider protocols
-  (`MarketDataProvider` ticks feed the setup engine;
-  `EventCalendarProvider` feeds the macro overlay).
-- [ADR 005](archive/005-dashboard-layout.md) — Dashboard layout
-  (consumes the engine's recommendation states).
-- [ADR 006](archive/006-ai-chat-widget.md) — AI chat widget
-  (consumes rule state as auto-injected context, cannot mutate it).
+- [ADR 004](archive/004-mvp-scope.md) — Phase 1 MVP scope
+  sketch. Phase 1 narrowed to trend-only after the 2026-04-25
+  audit.
+- [ADR 008](008-backend-providers.md) — `MarketDataProvider`
+  feeds the trend engine (bar window).
+- [ADR 005](archive/005-dashboard-layout.md) — Dashboard
+  banner consumes `TrendState` (was four setup-trigger
+  emissions).
+- [ADR 006](archive/006-ai-chat-widget.md) — Chat auto-injects
+  `TrendState` (was rule state).

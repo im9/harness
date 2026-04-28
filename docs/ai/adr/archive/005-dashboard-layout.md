@@ -300,6 +300,21 @@ without waiting for the backend providers (ADR 008) or engine
 wire-up is a Future extension below, deliberately deferred until the
 backend lands.
 
+## Revisions
+
+**2026-04-25 — Trend pivot (ADR 007 revision).** The state model
+displayed in the banner narrows from the four setup-trigger
+emissions (`ENTER` / `HOLD` / `EXIT` / `RETREAT`) to `TrendState`
+(`up` / `down` / `range`). The dashboard layout topology, swap
+mechanics, charting library choices, and widget boundaries
+documented above are unaffected — only the banner state copy and
+the `ChatContext` projection change. Setup-specific chart
+annotations (target / retreat lines, setup range shading, setup
+trigger markers, macro event vertical band) are deferred along
+with the setup / rule / macro layers; they return when those
+layers do, as per-feature ADRs. The wire-format and frontend
+display transition lands alongside ADR 007's implementation slice.
+
 ## Future extensions
 
 - **Wire frontend to real `GET /api/dashboard` +
