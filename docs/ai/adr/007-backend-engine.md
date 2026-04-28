@@ -84,10 +84,12 @@ top of this trend core when its data source materializes.
 
 ## Implementation
 
-- [ ] Backend: `TrendEngine` — pure
+- [x] Backend: `TrendEngine` — pure
       `(bars, indicator_config) → TrendState`. Phase 1 indicator:
-      linear regression on close prices.
-- [ ] Backend: extend `MarketDataProvider` with
+      linear regression on close prices. Range covers cold-start
+      (n<2), constant series (ss_tot=0), and low-confidence
+      (R²<min_confidence) cases.
+- [x] Backend: extend `MarketDataProvider` with
       `.bars(symbol, timeframe, count)` for bar-window input
       (ADR 008 amendment).
 - [ ] Frontend: dashboard banner state model swap
