@@ -67,9 +67,7 @@ def compute_trend(bars: Sequence[Bar], config: IndicatorConfig) -> TrendState:
     ss_tot = sum((y - mean_y) ** 2 for y in ys)
     if ss_tot == 0:
         return TrendState.RANGE
-    ss_res = sum(
-        (y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys, strict=True)
-    )
+    ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys, strict=True))
     r_squared = 1.0 - ss_res / ss_tot
 
     if r_squared < config.min_confidence:

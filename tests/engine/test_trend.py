@@ -17,9 +17,7 @@ from harness.engine import IndicatorConfig, TrendState, compute_trend
 from harness.providers.market_data import Bar
 from harness.providers.market_data_scenario import ScenarioMarketData
 
-_FIXTURE = (
-    Path(__file__).parent.parent / "providers" / "fixtures" / "scenario_basic.yaml"
-)
+_FIXTURE = Path(__file__).parent.parent / "providers" / "fixtures" / "scenario_basic.yaml"
 
 
 def _bars_with_closes(closes: list[str | int | float]) -> list[Bar]:

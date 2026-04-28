@@ -75,9 +75,7 @@ class SynthesizedMarketData:
             yield tick
             ts = ts + self._tick_interval
 
-    async def bars(
-        self, symbol: str, timeframe: str = "1m", count: int = 20
-    ) -> tuple[Bar, ...]:
+    async def bars(self, symbol: str, timeframe: str = "1m", count: int = 20) -> tuple[Bar, ...]:
         # Decoupled from subscribe so engine TDD has a clean input
         # (ADR 007 — pure `(bars, indicator_config) → TrendState`).
         # Same `(seed, symbol, timeframe, count)` → identical bars.
